@@ -407,7 +407,9 @@ Guide (`doc/users-guide.md`, how to use poc), the Reference Guide
 Each package is built on a host running its system and architecture -
 the original developer's are section 4's: alerik and rackhir for FreeBSD
 amd64 and arm64, cymoril and jherek for OpenBSD i386 and amd64, artos and
-yishana for NetBSD amd64 and i386, atla for Fedora. The paths below (`$HOME/ports-work`,
+yishana for NetBSD amd64 and i386, atla for Fedora and (in a container)
+Debian amd64, and sadric, a Raspberry Pi 400 running Raspberry Pi OS
+(trixie), for Debian arm64. The paths below (`$HOME/ports-work`,
 `~/pkgsrc-work`) are theirs; any will do. Each package is built from a
 release tarball (`make dist`, section 7),
 named in it by version and fetched from the GitHub release; until there is
@@ -434,6 +436,41 @@ group) checks that the build dependencies are enough. Without the group it
 asks for root's password; after `usermod -aG mock`, `sg mock -c "mock ..."`
 has the group before you log in again. Install with `dnf
 install <rpm>`, check `/usr/bin/poc`, and `dnf remove peaseblossom`.
+
+### Debian (`packaging/debian`)
+
+The package is built from the tarball unpacked, with `packaging/debian`
+copied in as `debian/`, beside the tarball under Debian's name for it, by
+an ordinary user on Debian 13 (trixie) with `build-essential debhelper
+devscripts lintian` and the `Build-Depends` installed:
+
+    ln -s peaseblossom-<version>.tar.gz peaseblossom_<version>.orig.tar.gz
+    tar xzf peaseblossom_<version>.orig.tar.gz
+    cp -r peaseblossom-<version>/packaging/debian peaseblossom-<version>/debian
+    cd peaseblossom-<version> && dpkg-buildpackage -us -uc
+    cd .. && lintian -I --pedantic peaseblossom_<version>-1_<arch>.changes
+
+It makes `peaseblossom_<version>-1_<arch>.deb` and
+`peaseblossom-vax_<version>-1_all.deb`. `debian/rules` runs `check.sh` and
+`check-vax.sh` on the installed tree (after `dh_auto_install`: dh tests
+before it installs), unless `DEB_BUILD_OPTIONS=nocheck`. lintian should
+report no errors or warnings: its overrides are in
+`peaseblossom.lintian-overrides` (poc-rtl is installed unstripped, as for
+Fedora). A clean system checks that `Build-Depends` is enough, as `mock`
+does for Fedora: on atla, a `debian:trixie` container, with the tarball
+and `packaging/debian` in `<dir>`, as root in it installing the tools and
+building as a user it adds:
+
+    podman run --rm -it -v <dir>:/work:Z docker.io/library/debian:trixie
+
+(about 4 minutes; Docker Hub may need `--authfile` naming a file holding
+`{}` if podman's stored credentials for it are stale). On sadric the
+build takes about 22 minutes. Leave the `.deb`s in `~/deb-build` on each
+host, where `tools/release-files` takes them from (section 7): on atla,
+mount it as the container's `<dir>`. Raspberry Pi OS is trixie with a library or
+two of its own, but the package depends only on `clang` and `libc6`, so
+it is Debian's. Install with `apt install ./<deb>`, check `/usr/bin/poc`,
+and `apt remove peaseblossom`.
 
 ### FreeBSD (`packaging/freebsd/lang/peaseblossom`)
 
@@ -515,13 +552,16 @@ the names, and the variables that give them to the tools, are yours.
    package: `Version` in the spec (with `Release` back to 1),
    `DISTVERSION` in the FreeBSD ports, `V` in the OpenBSD port and
    `DISTNAME` in pkgsrc's packages (`peaseblossom-vax` is a port of its
-   own for FreeBSD and pkgsrc, a subpackage for Fedora and OpenBSD), and in `INSTALL.md`'s example, the
+   own for FreeBSD and pkgsrc, a subpackage for Fedora, Debian and OpenBSD), and in `INSTALL.md`'s example, the
    Reference Guide's "describes poc <major.minor>" and the VAX/VMS
    Guide's example of unpacking the kits. It removes any
-   `PORTREVISION`, `REVISION` or `PKGREVISION`, and adds a `%changelog` entry that says only "Update to
-   <x.y.z>.", for you to fill in. A library records the version that
-   built it, and poc refuses one from another version, so libraries are
-   rebuilt.
+   `PORTREVISION`, `REVISION` or `PKGREVISION`, and adds a `%changelog`
+   entry and an entry for `<x.y.z>-1` at the top of
+   `packaging/debian/changelog` (Debian's version is its changelog's),
+   each saying only "Update to <x.y.z>.", for you to fill in; both are
+   signed with git's `user.name` and `user.email`. A library records the
+   version that built it, and poc refuses one from another version, so
+   libraries are rebuilt.
 2. **Check** on the four hosts (section 4), with `check-install` and
    `check-seed` as well:
 
@@ -574,7 +614,8 @@ the names, and the variables that give them to the tools, are yours.
    and on the project's own site. Besides what changed, the notes say how
    to install each package (`INSTALL.md`, section 5, "Installing a
    release's package"), with this release's file names: as root,
-   `dnf install ./<rpm>`, `pkg add ./<pkg>` or `pkg_add ./<tgz>`; and for
+   `dnf install ./<rpm>`, `apt install ./<deb>`, `pkg add ./<pkg>` or
+   `pkg_add ./<tgz>`; and for
    OpenBSD, whose `pkg_add` takes a package only under its own name,
    `peaseblossom-<version>.tgz`, the download under that name with
    `ftp -o` and `pkg_add -D unsigned`. `peaseblossom-vax`, for `poc
@@ -596,6 +637,8 @@ the names, and the variables that give them to the tools, are yours.
 
        peaseblossom-<version>-1.fc44.x86_64.rpm, peaseblossom-<version>-1.fc44.src.rpm
        peaseblossom-vax-<version>-1.fc44.noarch.rpm
+       peaseblossom-<version>-1-debian13-amd64.deb, peaseblossom-<version>-1-debian13-arm64.deb
+       peaseblossom-vax-<version>-1-debian13-all.deb
        peaseblossom-<version>-freebsd15.1-amd64.pkg, peaseblossom-<version>-freebsd15.1-arm64.pkg
        peaseblossom-vax-<version>-freebsd15.1.pkg
        peaseblossom-<version>-openbsd7.9-i386.tgz, peaseblossom-<version>-openbsd7.9-amd64.tgz
@@ -607,8 +650,8 @@ the names, and the variables that give them to the tools, are yours.
    `peaseblossom-vax` is all text: one package for FreeBSD (`NO_ARCH`)
    and for OpenBSD (`PKG_ARCH = *`), but one for each NetBSD
    architecture, since pkgsrc's packages are each for a machine. It is
-   built as `peaseblossom` is: Fedora's and OpenBSD's from the same spec
-   or port, FreeBSD's and pkgsrc's from `lang/peaseblossom-vax`, which
+   built as `peaseblossom` is: Fedora's, Debian's and OpenBSD's from the
+   same spec, `debian/` or port, FreeBSD's and pkgsrc's from `lang/peaseblossom-vax`, which
    shares `lang/peaseblossom`'s `distinfo` and builds poc from the seed
    again. OpenBSD's and pkgsrc's packing lists (`PLIST-vax`, `PLIST`)
    name the kits by `${KIT_V}`, the version with hyphens.
@@ -621,7 +664,16 @@ the names, and the variables that give them to the tools, are yours.
      host's `uname`. `FREEBSD_HOSTS`, `OPENBSD_HOSTS` and `NETBSD_HOSTS`
      name those hosts, one for each architecture; they default to the
      original developer's, `"alerik rackhir"`, `"cymoril jherek"` and
-     `"artos yishana"`.
+     `"artos yishana"`;
+   - each Debian package from `~/deb-build` on the host that built it
+     (section 6), by `scp`, or by `cp` from this machine's own, renamed
+     as above: `peaseblossom_<version>-1_amd64.deb` becomes
+     `peaseblossom-<version>-1-debian13-amd64.deb`, the architecture
+     taken from its name, and one `peaseblossom-vax` comes from the first
+     host. `DEBIAN_HOSTS` names those hosts (default `"atla
+     sadric"`), and `DEBIAN_RELEASE` Debian's release (default 13).
+     They are not signed themselves: `SHA256SUMS` vouches for them, as
+     for the BSDs' packages.
 
    It refuses to go on until the RPMs there are signed. Sign them in place
    with the `rpmsign` command it prints, then run it again; a file already

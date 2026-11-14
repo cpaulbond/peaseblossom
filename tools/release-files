@@ -10,7 +10,14 @@
 # peaseblossom-<version>-freebsd15.1-amd64.pkg. peaseblossom-vax, all text,
 # is one package for FreeBSD and for OpenBSD, taken from the first host
 # (peaseblossom-vax-<version>-openbsd7.9.tgz), and one for each NetBSD
-# architecture, since pkgsrc's packages are each for a machine. Then
+# architecture, since pkgsrc's packages are each for a machine. Debian's
+# packages come from ~/deb-build on each of DEBIAN_HOSTS (section 6), by
+# scp, or by cp from this machine's own (on atla, the trixie container's
+# directory), renamed for Debian's release (DEBIAN_RELEASE, default 13)
+# and the architecture in Debian's name, e.g.
+# peaseblossom-<version>-1-debian13-amd64.deb; peaseblossom-vax's, all
+# text, from the first host, as peaseblossom-vax-<version>-1-debian13-all.deb.
+# Then
 # it writes SHA256SUMS, the SHA-256 sum of every one of them, and signs
 # that with gpg's default key (GPG_KEY names another) as SHA256SUMS.asc.
 #
@@ -20,10 +27,10 @@
 # the gh release upload command that would. Run as tools/release-files
 # from anywhere, or make release-files; the version is Version.number.
 #
-# FREEBSD_HOSTS, OPENBSD_HOSTS and NETBSD_HOSTS name the hosts, one for
-# each architecture a package is made for; they default to the original
-# developer's, alerik and rackhir, cymoril and jherek, and artos and
-# yishana.
+# FREEBSD_HOSTS, OPENBSD_HOSTS, NETBSD_HOSTS and DEBIAN_HOSTS name the
+# hosts, one for each architecture a package is made for; they default to
+# the original developer's, alerik and rackhir, cymoril and jherek, artos
+# and yishana, and atla and sadric.
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -90,6 +97,35 @@ done
 for host in ${NETBSD_HOSTS:-artos yishana}; do
   fetch "$host" netbsd "pkgsrc-work/pkgsrc/packages/All/$name.tgz" tgz
   fetch "$host" netbsd "pkgsrc-work/pkgsrc/packages/All/$vax.tgz" tgz "$vax"
+done
+
+# fetch_deb HOST PACKAGE ARCH: Debian's PACKAGE_<version>-1_ARCH.deb from
+# HOST's ~/deb-build, as PACKAGE-<version>-1-debian<release>-ARCH.deb;
+# ARCH * takes the one there is, named by the architecture in its name
+fetch_deb() {
+  dir=deb-build
+  if [ "$1" = "$(hostname -s)" ] || [ "$1" = localhost ]; then
+    found=$(ls "$HOME/$dir/$2_$version-1_"$3.deb 2>/dev/null) || true
+  else
+    found=$(ssh "$1" "ls $dir/$2_$version-1_$3.deb" 2>/dev/null) ||
+      [ $? != 255 ] || die "could not reach $1"
+  fi
+  set -- "$1" "$2" $found
+  [ $# = 3 ] || die "want one $2 package in $1:$dir, found: ${3:-none}"
+  arch=${3##*_}; arch=${arch%.deb}
+  target=$out/$2-$version-1-debian${DEBIAN_RELEASE:-13}-$arch.deb
+  if [ ! -f "$target" ]; then
+    case $3 in
+      /*) cp "$3" "$target" ;;
+      *) scp -q "$1:$3" "$target" || die "could not fetch $3 from $1" ;;
+    esac
+  fi
+}
+first=
+for host in ${DEBIAN_HOSTS:-atla sadric}; do
+  fetch_deb "$host" peaseblossom '*'
+  [ -n "$first" ] || fetch_deb "$host" peaseblossom-vax all
+  first=$host
 done
 
 unsigned=

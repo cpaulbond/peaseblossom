@@ -10,11 +10,14 @@
 # unpacking the tarball and installing a release's packages (their file
 # names and download URLs), the Reference Guide's "describes poc
 # <major.minor>" and the VAX/VMS Guide's example of unpacking the kits
-# (their names, POC-<x-y-z>, and what POC -VERSION prints). The
-# %changelog entry says only "Update to <version>.", for the person
-# releasing to fill in; one already there for the version is kept. Each package's distinfo is of the published tarball, so it is made
-# later, on its system (section 6). Run as tools/set-version <x.y.z>, or
-# make set-version VERSION=<x.y.z>, from anywhere.
+# (their names, POC-<x-y-z>, and what POC -VERSION prints). Debian's
+# version is its changelog's: packaging/debian/changelog gets an entry for
+# <version>-1 at its top. That entry and the %changelog one say only
+# "Update to <version>.", for the person releasing to fill in; one already
+# there for the version is kept. Each package's distinfo is of the
+# published tarball, so it is made later, on its system (section 6). Run
+# as tools/set-version <x.y.z>, or make set-version VERSION=<x.y.z>, from
+# anywhere.
 set -e
 
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -47,6 +50,7 @@ must src/driver/Version.Mod '^ *number\* *= *"[^"]*";'
 must packaging/fedora/peaseblossom.spec '^Version: '
 must packaging/fedora/peaseblossom.spec '^Release: '
 must packaging/fedora/peaseblossom.spec '^%changelog$'
+must packaging/debian/changelog '^peaseblossom \('
 must packaging/freebsd/lang/peaseblossom/Makefile '^DISTVERSION='
 must packaging/freebsd/lang/peaseblossom-vax/Makefile '^DISTVERSION='
 must packaging/openbsd/lang/peaseblossom/Makefile '^V ='
@@ -71,6 +75,23 @@ if ! grep -q "^\* .* - $version-1\$" "$ROOT/$spec"; then
 
 "
   note="; fill in the %changelog entry in $spec"
+fi
+
+# Debian's changelog: a new entry first, in debchange's form (the date as
+# date -R writes it, which BSD date cannot be asked for by name)
+changelog=packaging/debian/changelog
+if ! grep -q "^peaseblossom ($version-1)" "$ROOT/$changelog"; then
+  who="$(git -C "$ROOT" config user.name) <$(git -C "$ROOT" config user.email)>"
+  when=$(LC_ALL=C date '+%a, %d %b %Y %H:%M:%S %z')
+  {
+    printf 'peaseblossom (%s-1) unstable; urgency=medium\n\n' "$version"
+    printf '  * Update to %s.\n\n' "$version"
+    printf ' -- %s  %s\n\n' "$who" "$when"
+    cat "$ROOT/$changelog"
+  } >"$ROOT/$changelog.tmp.$$"
+  cat "$ROOT/$changelog.tmp.$$" >"$ROOT/$changelog"; rm -f "$ROOT/$changelog.tmp.$$"
+  echo "set-version: $changelog"
+  note="$note; fill in the entry in $changelog"
 fi
 
 for port in peaseblossom peaseblossom-vax; do
