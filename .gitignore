@@ -397,3 +397,7 @@ test/conformance/vax-tasks-events/work/
 test/conformance/vax-tasks-events/*.com
 !test/conformance/vax-tasks-events/guest-run.com
 !test/conformance/vax-tasks-events/TASKWRITER.COM
+test/conformance/vax-tasks-input/work/
+test/conformance/vax-tasks-input/*.com
+!test/conformance/vax-tasks-input/guest-run.com
+test/conformance/vax-tasks-terminal/work/

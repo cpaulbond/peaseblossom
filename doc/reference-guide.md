@@ -3256,6 +3256,49 @@ MODULE Strings;
 END Strings.
 ```
 
+### TaskInput
+
+```text
+doc/developer/tasks.md, Phase 11: standard input read by a task
+without stopping the others, for POSIX. rtl/vax/TaskInput.Mod has the
+same interface for VAX/VMS.
+
+Char and Line mean what In's do, read through a FormattedInput.Source
+of this module's own with In's read-ahead rule: past a line end the
+next character is not read until it is wanted, so that a line is
+returned without waiting for the next one. A Tasks.Mutex holds each
+call, so that two tasks reading at once take whole lines. A program
+reads standard input through In or through TaskInput, not both: each
+reads ahead of what it returns (In through C's getchar).
+
+The module keeps a buffer of 4 KiB. When it is empty, the task waits
+by Tasks.AwaitReadable(0) while the others run, then reads up to 4 KiB
+by one Platform.Read; a count of 0, or an error, is the end of the
+input, for good. O_NONBLOCK is never set: descriptor 0 is shared with
+the shell, and the flag would outlive the program. A terminal in
+canonical mode is readable once a line is complete, a pipe once data
+is there, and a regular file or /dev/null always, so the read does
+not block - unless another process reading the same descriptor takes
+the data between the poll and the read, which blocks every task.
+```
+
+```oberon
+MODULE TaskInput;
+  VAR
+    (* whether the last operation succeeded *)
+    Done-: BOOLEAN;
+
+  (* The next character, line end (0AX) included. Done is FALSE, and ch 0X,
+     at the end of the input. *)
+  PROCEDURE Char*(VAR ch: CHAR);
+
+  (* The rest of the line - up to a line feed, and without the carriage
+     return before it - cut short if line cannot hold it all (the rest is
+     then left for the next read). Done is FALSE at the end of the input. *)
+  PROCEDURE Line*(VAR line: ARRAY OF CHAR);
+END TaskInput.
+```
+
 ### TaskWaiting
 
 ```text

@@ -2062,8 +2062,8 @@ channels, in Oberon over `Coroutines`, the same source on both back ends,
 with a way for signals, ASTs, timers and descriptors to wake a task. Option
 C of `doc/research/concurrency-survey.md`; decided with the user 2026-11-14,
 after the probes the survey's section 10 records. `doc/developer/tasks.md`
-has the interface, the fourteen decisions and the plan. Implemented but for
-`TaskInput` (Phase 11).
+has the interface, the fourteen decisions and the plan. Implemented, with
+`TaskInput` (Phases 9-11).
 
 What a program will be able to observe:
 
@@ -2104,9 +2104,32 @@ What a program will be able to observe:
   without `Coroutines`' AST-level check, which would cost some 20 µs a
   switch in a program that imports `AsynchronousTraps`, so a blocking call
   in an AST routine is undefined.
+- **`TaskInput` reads standard input as a task** (Phase 11): `Char`,
+  `Line` and `Done` mean what `In`'s do, and while one task waits for a
+  line the others run. A mutex holds each call, so two tasks reading at
+  once take whole lines.
+  - POSIX: `AwaitReadable(0)`, then one `read` of up to 4 KiB.
+    `O_NONBLOCK` is never set.
+  - VMS, by `SYS$INPUT`'s device class: a terminal or a mailbox is read a
+    record at a time by a `$QIO` whose AST posts. A record gets a line
+    feed, but a terminal read ended by a full buffer of 512 does not, and
+    the rest of the line comes next. A longer mailbox message is cut
+    short. `SS$_ENDOFFILE`, or Ctrl/Z on a terminal, is the end. Anything
+    else (a disk file, `NL:`, a batch job's input) is read by RMS, which
+    stops every task while it reads.
+  - On a VMS terminal, Out's unfinished line is the read's prompt, as
+    with `In`. While a read is pending, `Out`'s and `Err`'s lines to a
+    terminal break through it (`IO$M_BREAKTHRU!IO$M_REFRESH`), and VMS
+    then redraws the prompt and what has been typed. A trap first
+    cancels the read. A program that does not import `TaskInput` pays one
+    test per line.
 - **Rules the program keeps, which nothing checks:**
   - A blocking call that is not one of `Tasks`' (a disk read, `In`,
     `Platform.Delay`) stops every task.
+  - A program reads standard input through `In` or `TaskInput`, not both:
+    each reads ahead of what it returns. On POSIX, another process that
+    takes the data between `TaskInput`'s `poll` and its `read` stops
+    every task until more comes.
   - `Coroutines` may be used only inside one task, and that task must be
     back on its own coroutine before it calls `Tasks` again.
   - A task blocked on a channel nothing else can reach is a leak.

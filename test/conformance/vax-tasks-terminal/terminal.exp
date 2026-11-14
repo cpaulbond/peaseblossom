@@ -1,0 +1,152 @@
+# vax-tasks-terminal's session on the VAX/VMS development system (doc/
+# developer/tasks.md, Phase 11, proposal 6), run by test.sh while it holds
+# the guest's lock (tools/vax-lock.sh): copies the files there by FTP
+# (tools/vax-ftp.tcl), logs in by telnet (tools/vax-login.tcl), builds
+# TASKTERM.EXE by @GUEST-BUILD, runs it at the terminal and types two lines
+# and Ctrl/Z by a timeline, then deletes every file of the run there,
+# whatever happened. Writes what the terminal showed, each piece stamped
+# with its time in ms from the first prompt, to <transcript>.
+#
+#   expect -f terminal.exp <host> <transcript> {<file> <NAME.EXT>}...
+#
+# The password is read from $VAX_NETRC by vax_login, never on a command
+# line, and nothing is shown while it is sent (log_user 0).
+
+set host [lindex $argv 0]
+set transcript [lindex $argv 1]
+set puts [lrange $argv 2 end]
+set timeout 600
+log_user 0
+
+set tools [file join [file dirname [info script]] .. .. .. tools]
+source [file join $tools vax-login.tcl]
+source [file join $tools vax-ftp.tcl]
+
+if {[catch {ftp_open $host} message]} {
+  puts stderr "terminal.exp: the VAX guest $host is not available ($message)"
+  exit 2
+}
+# from here on, whatever happens, every file of this run is deleted there
+set made {GUEST-BUILD.LOG TASKTERM.OPT TASKTERM.EXE}
+foreach {file remote} $puts {
+  lappend made $remote
+  if {[string match *.MAR $remote]} { lappend made [file rootname $remote].OBJ }
+}
+exit -onexit {
+  foreach remote $::made { catch {ftp_delete $remote} }
+  ftp_close
+}
+foreach {file remote} $puts {
+  if {[catch {ftp_put $file $remote} message]} { fail "cannot copy $file there: $message" }
+}
+
+vax_login $host
+send "@GUEST-BUILD/OUTPUT=GUEST-BUILD.LOG\r"
+set deadline [expr {[clock seconds] + $timeout}]
+set done 0
+while {!$done} {
+  expect {
+    -timeout 60
+    -re $prompt { set done 1 }
+    timeout {}
+    eof { fail "the telnet session ended while GUEST-BUILD ran" }
+  }
+  if {!$done} {
+    if {[clock seconds] >= $deadline} { fail "GUEST-BUILD did not finish within $timeout seconds" }
+    catch ftp_noop
+  }
+}
+send "WRITE SYS\$OUTPUT \"BUILD-STATUS \", \$STATUS\r"
+expect {
+  -re {BUILD-STATUS %X([0-9A-F]{8})\r?\n} { set status $expect_out(1,string) }
+  timeout { fail "no status after GUEST-BUILD" }
+}
+expect -re $prompt
+if {!([scan $status %x] & 1)} {
+  puts "build status: %X$status"
+  catch {ftp_get GUEST-BUILD.LOG guest-build.log}
+  if {[file exists guest-build.log]} { puts [read [open guest-build.log]]; file delete guest-build.log }
+  exit 1
+}
+
+set out [open $transcript w]
+set start [clock milliseconds]
+# what the terminal showed, carriage returns left out, with each key typed
+# marked in it, between two \001s, where it was sent
+set all ""
+proc stamp {s} {
+  append ::all [string map {"\r" ""} $s]
+  set t [expr {[clock milliseconds] - $::start}]
+  regsub -all {\r} $s {<CR>} s
+  regsub -all {\033} $s {<ESC>} s
+  regsub -all {\032} $s {<^Z>} s
+  regsub -all {\007} $s {<BEL>} s
+  foreach line [split $s "\n"] {
+    puts $::out [format "%6d| %s" $t $line]
+  }
+}
+set timeout 30
+send "RUN TASKTERM\r"
+expect {
+  -re {TASKTERM START\r?\n} {}
+  timeout { puts "TASKTERM did not start"; exit 1 }
+}
+expect {
+  -re {Text\? } { set start [clock milliseconds]; stamp $expect_out(buffer) }
+  timeout { puts "no first prompt"; exit 1 }
+}
+# the keystrokes, each at its time in ms from the first prompt: "abc"
+# slowly, 1.2 s a key against the ticker's 0.7 s, so that a tick comes
+# after each; "xyz" quickly; then Ctrl/Z
+set plan {{1500 a} {2700 b} {3900 c} {5100 "\r"} {6600 x} {6800 y} {7000 z} {7200 "\r"} {9000 "\032"}}
+set timeout 0
+while {![regexp {end of input\n.*VAXASM> $} $all]} {
+  set now [expr {[clock milliseconds] - $start}]
+  if {[llength $plan] > 0 && $now >= [lindex $plan 0 0]} {
+    set k [lindex $plan 0 1]
+    send -- $k
+    puts $out [format "%6d> typed %s" $now [string map {"\r" <CR> "\032" <^Z>} $k]]
+    append all "\001$k\001"
+    set plan [lrange $plan 1 end]
+  }
+  expect {
+    -re {.+} { stamp $expect_out(buffer) }
+    eof { puts "the telnet session ended while TASKTERM ran"; exit 1 }
+    timeout { after 20 }
+  }
+  if {[clock milliseconds] - $start > 40000} { puts "TASKTERM did not end"; break }
+}
+close $out
+send "LOGOUT\r"
+set timeout 30
+expect eof
+
+# What was shown, said so that timing does not change it
+set pieces [split $all \001]
+set text ""
+set redraws {}
+set keys 0
+set ticksBefore 0
+for {set i 0} {$i < [llength $pieces]} {incr i} {
+  set piece [lindex $pieces $i]
+  if {$i % 2 == 1} {
+    incr keys
+  } else {
+    foreach {match typed} [regexp -all -inline {tick\nText\? ([a-z]*)} $piece] {
+      if {$keys == 0} { incr ticksBefore }
+      # while abc is typed: the first key up to its Return
+      if {$keys >= 1 && $keys <= 3 && $typed ne ""} { lappend redraws "Text? $typed" }
+    }
+  }
+  append text $piece
+}
+puts "ticks before the first key: [expr {$ticksBefore > 0 ? "yes" : "no"}]"
+puts "prompts redrawn while abc was typed: [join [lsort -unique $redraws] {, }]"
+set ticks [regexp -all {tick\n} $text]
+set redrawn [regexp -all {tick\nText\? } $text]
+puts "every tick redrew the prompt: [expr {$ticks > 0 && $ticks == $redrawn ? "yes" : "no ($redrawn of $ticks)"}]"
+foreach {match line} [regexp -all -line -inline {^line: (.*)$} $text] { puts "line: $line" }
+puts "Ctrl/Z echoed as Exit: [expr {[string first "\033\[7m Exit \033\[m" $text] >= 0 ? "yes" : "no"}]"
+puts "end of input: [expr {[regexp {\nend of input\n} $text] ? "yes" : "no"}]"
+puts "back at DCL: [expr {[regexp {VAXASM> $} $text] ? "yes" : "no"}]"
+exit 0

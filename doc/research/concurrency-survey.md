@@ -2012,3 +2012,31 @@ From 10.1-10.4, beyond `tasks.md`'s decisions as they stand:
 7. **The guide says that an override of `Run` is exported** (10.2).
 8. **For Phase 11**: terminal output stalls behind a pending read, and
    `SYS$INPUT` from a file needs a fallback (10.1).
+
+### 10.6 Output during a terminal read (Phase 11)
+
+10.1's question from the I/O manual (8.2.2.1), probed on the SIMH guest
+on 2026-11-14 over telnet, as the user's terminal would be. A probe
+program assigned `TT:`, started a read `$QIO` with an AST, and wrote a
+tick every 250 ms while a script typed three characters 0.5 s apart
+and then Return two seconds later. There were three parts:
+
+- **A: a `$QIO` `IO$_READVBLK`, ticks written by `Out`** (RMS,
+  `LIB$PUT_OUTPUT`). The ticks came on time until the first
+  character. The tick made next (2250 ms) arrived only with Return
+  (4500 ms), and no tick was made in between: `LIB$PUT_OUTPUT` waited
+  behind the active read, and the whole process waited with it, as
+  the manual says.
+- **B: a `$QIO` `IO$_READPROMPT`** (prompt CR LF `B> `), **each tick a
+  `$QIOW` `IO$_WRITEVBLK!IO$M_BREAKTHRU!IO$M_REFRESH` on the read's
+  channel.** Every tick came on time while the characters were typed,
+  each followed by the prompt and what had been typed so far, redrawn
+  (`B> x`, `B> xy`, `B> xyz`). The read returned `xyz`, count 3.
+- **C: B's writes on a second channel assigned to `TT:`**, as the
+  runtime's `POC_OUT_CHANNEL` is. The same as B: breakthrough and
+  refresh act on the device, whichever channel writes.
+
+So output from other tasks need not stop while a task reads the
+terminal, if the runtime writes to the terminal with breakthrough and
+refresh while such a read is pending. Phase 11's proposals take this
+way.

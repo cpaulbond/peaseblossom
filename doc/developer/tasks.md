@@ -96,6 +96,12 @@ DEFINITION Tasks;
   PROCEDURE AwaitWritable (fd: LONGINT);
   PROCEDURE WakeDescriptor (): LONGINT;
 END Tasks.
+
+DEFINITION TaskInput;   (* Phase 11 *)
+  VAR Done-: BOOLEAN;
+  PROCEDURE Char (VAR ch: CHAR);           (* as In's, the other tasks running *)
+  PROCEDURE Line (VAR line: ARRAY OF CHAR);
+END TaskInput.
 ```
 
 ## Decisions
@@ -412,6 +418,132 @@ not read by a record `$QIO`, so `TaskInput` on VMS needs a synchronous
 RMS fallback when it is neither a terminal nor a mailbox. Fixtures: on Unix, lines fed through a
 pipe slowly while a ticker task runs, its ticks interleaved with them;
 on the guest, the same from a file and from a mailbox.
+
+**Proposals (2026-11-14, for the user's approval).** The terminal
+question was probed first (survey 10.6). While a read is pending and the
+user types, a plain RMS write waits, and the whole process waits with
+it. A `$QIOW` with `IO$M_BREAKTHRU!IO$M_REFRESH` goes through at once,
+from any channel to the terminal, and VMS then redraws the prompt and
+what has been typed.
+
+1. **The interface**, the same on both back ends:
+
+   ```oberon
+   DEFINITION TaskInput;
+     VAR Done-: BOOLEAN;
+     PROCEDURE Char (VAR ch: CHAR);
+     PROCEDURE Line (VAR line: ARRAY OF CHAR);
+   END TaskInput.
+   ```
+
+   - `Char` and `Line` mean what `In`'s do: `Line` cuts a line short
+     when it does not fit and leaves the rest for the next read, and at
+     the end of the input `Done` is FALSE and `ch` is 0X. Both read
+     through a `FormattedInput.Source` of TaskInput's own, as `In` does,
+     with the same read-ahead rule, so that a line is returned without
+     waiting for the next one. Only the source's `Ready` waits, as a
+     task.
+   - `Done` is read right after a call. Nothing can switch in between,
+     so another task's call cannot change it first.
+   - An internal `Tasks.Mutex` holds each call, so that two tasks
+     reading at once take whole lines, not each other's characters.
+   - A program reads standard input through `In` or through
+     `TaskInput`, not both. Each module reads ahead of what it returns,
+     and on VMS each reads on its own channel. The guide says so, and
+     nothing checks it.
+   - `In`'s other procedures (`Int`, `Name`, ...) would each be one
+     line over the same source. They are left out until wanted.
+
+2. **POSIX** (`rtl/llvm/TaskInput.Mod`, Oberon only):
+   - The module keeps a 4 KiB buffer. When it is empty,
+     `Tasks.AwaitReadable(0)`, then one `Platform.Read` of up to 4 KiB.
+     A count of 0, or an error, is the end of the input. `Platform`'s C
+     already retries a read that EINTR interrupts.
+   - `O_NONBLOCK` is never set: descriptor 0 is shared with the shell,
+     and the flag would outlive the program.
+   - A terminal in canonical mode is readable only once a line is
+     complete, and a pipe once data is there, so the read does not
+     block. A regular file and `/dev/null` are always readable, and
+     their read returns at once.
+   - The one case that blocks every task: another process holding the
+     same descriptor takes the data between the `poll` and the `read`.
+     The guide says so.
+
+3. **VMS: by `SYS$INPUT`'s device class** (`rtl/vax/TaskInput.Mod`),
+   found by `$GETDVIW DVI$_DEVCLASS` at the first read:
+   - **A terminal or a mailbox**: `$ASSIGN` `SYS$INPUT`. Each record is
+     read by a `$QIO` into a 512-byte buffer, with an AST that posts an
+     `Event` the reading task awaits.
+     - A record gets a line feed after it, except a terminal read ended
+       by a full buffer (terminator size 0, I/O manual 8.5). The rest of
+       such a line comes with the next read.
+     - The end of the input is `SS$_ENDOFFILE`: a mailbox's
+       `IO$_WRITEOF`, or a terminal's. A terminal read whose terminator
+       is Ctrl/Z (1AX) is the end as well, as RMS takes it.
+     - A mailbox message longer than 512 bytes is cut short
+       (`SS$_BUFFEROVF`).
+   - **Anything else** (a disk file, a batch job's input, `NL:`):
+     `Platform.Read(StdIn)`, synchronously, as `In` does. It blocks
+     every task while RMS reads, as decision 11 says of a disk read.
+
+4. **Output while a terminal read is pending: breakthrough**
+   (`rtl/vax/PocRtl.mar`):
+   - From the read's `$QIO` until the reading task resumes,
+     `POC_READ_CHANNEL` holds the read's channel (0 when none is
+     pending), so that `POC_TRAP` knows which to `$CANCEL`.
+   - While it is set, and `SYS$OUTPUT` is a terminal, `POC_PUT_LINE`
+     writes the record by `$QIOW IO$_WRITEVBLK!IO$M_BREAKTHRU!IO$M_REFRESH`
+     on `POC_OUT_CHANNEL`, with the line feed and carriage return a
+     record has, instead of `LIB$PUT_OUTPUT`. `POC_FLUSH_OUTPUT`'s
+     partial lines go the same way.
+   - `Err`'s lines go the same way when `SYS$ERROR` is a terminal, on a
+     channel of its own.
+   - `POC_TRAP` first `$CANCEL`s a pending read, so that a trap's
+     message is not held until the user presses Return.
+   - A program that does not import `TaskInput` pays one test of a
+     longword per line.
+   - The alternative, documenting that output stops, is not proposed:
+     the probe showed every task stopped for as long as the user takes
+     over a line.
+
+5. **The prompt, as `In`'s on VMS.** On a terminal, Out's unfinished
+   line becomes the read's prompt, after a line feed, exactly as
+   `POC_INPUT_GET` does for `In` (`IO$_READPROMPT`). So
+   `Out.String("Command? "); TaskInput.Line(s)` looks the same as with
+   `In`, and `REFRESH` redraws the prompt after each breakthrough
+   write.
+   - A new `POC_TASK_READ(channel, buffer, size, iosb, ast, parameter)`
+     in `PocRtl.mar` builds the prompt, issues the `$QIO` and sets
+     `POC_READ_CHANNEL`, and `POC_TASK_READ_DONE` clears it.
+   - On POSIX nothing is needed, since `Out` is unbuffered.
+
+6. **Fixtures**, each comparing its output, each with its `.gitignore`
+   line:
+   - `llvm-tasks-input`:
+     - A ticker task every 50 ms beside the main task reading lines,
+       fed by a shell pipeline that writes a line every 300 ms. The
+       output records the order of lines and runs of ticks ("ticks
+       between lines: yes"), not counts that depend on timing.
+     - Also: the same lines from a regular file and then the end,
+       `/dev/null`, `Char` across a line end, a long line cut short,
+       and two reading tasks taking whole lines.
+   - `vax-tasks-input`, both ways (MACRO-32 and objects):
+     - From a file: the synchronous fallback.
+     - From a mailbox: a feeder program `$CREMBX`es a mailbox, starts
+       the reader by `LIB$SPAWN` with the mailbox as its input
+       (`NOWAIT`), writes lines with pauses, then `IO$_WRITEOF`. The
+       ticks interleave as on Unix.
+   - `vax-tasks-terminal`: the probe's way, by telnet through
+     `tools/vax-login.tcl`. A ticker runs while the script types a
+     line slowly. Compared: ticks arrive while the line is being typed,
+     the line comes back whole, the prompt is redrawn, and Ctrl/Z ends
+     the input. This is the one fixture that drives the guest's
+     terminal itself. It tests proposal 4, the riskiest change.
+
+7. **Documents in this phase**: `TaskInput`'s `DEFINITION` in this
+   file's interface, and the rules in proposals 1 to 4 in
+   `language-extensions.md`'s "Tasks" and `AGENTS.md`'s summary. The
+   guide chapter and the READMEs come in Phases 12 and 13, as planned.
 
 ### Phase 12: Examples
 

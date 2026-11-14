@@ -1,0 +1,9 @@
+ticks before the first key: yes
+prompts redrawn while abc was typed: Text? a, Text? ab, Text? abc
+every tick redrew the prompt: yes
+line: abc
+line: xyz
+Ctrl/Z echoed as Exit: yes
+end of input: yes
+back at DCL: yes
+terminal.exp exit 0
