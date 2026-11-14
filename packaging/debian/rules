@@ -1,0 +1,69 @@
+#!/usr/bin/make -f
+# Debian packages of poc, the Peaseblossom Oberon-2 compiler, for trixie on
+# amd64 and arm64 (the Fedora spec, packaging/fedora/peaseblossom.spec, is
+# the model). Built from the release tarball (make dist), which carries
+# poc's own LLVM IR as seed/, so clang alone builds poc: voc is not needed.
+# This directory goes in the unpacked tarball as debian/:
+#
+#   tar xzf peaseblossom-<version>.tar.gz
+#   ln -s peaseblossom-<version>.tar.gz peaseblossom_<version>.orig.tar.gz
+#   cp -r peaseblossom-<version>/packaging/debian peaseblossom-<version>/debian
+#   cd peaseblossom-<version> && dpkg-buildpackage -us -uc
+#
+# poc runs clang itself with its own options (doc/developer/llvm-toolchain.md),
+# so dpkg-buildflags' CFLAGS and LDFLAGS do not reach it: poc and every
+# program it builds are PIE with RELRO anyway (fixture llvm-relro).
+#
+# The runtime library, poc-rtl, is installed where poc looks for it,
+# beside its own directory: /usr/lib/poc/<triple>/<O2|OC>[-g]/, as gcc
+# keeps its target files under /usr/lib/gcc. libpoc-rtl.so there is for
+# the programs poc builds, which find it by their run-time path, not for
+# the system's library search: no shlibs file, no symbols file.
+
+%:
+	dh $@
+
+# make clean also removes the conformance tests' leftovers, which the
+# tarball has none of
+override_dh_auto_clean:
+	$(MAKE) clean-build
+
+# The tarball has the VAX kits and the VAX/VMS Guide as text already:
+# installable-vax builds only the libraries. Not in parallel: the stages
+# follow each other anyway.
+override_dh_auto_build:
+	$(MAKE) installable installable-vax
+
+override_dh_auto_install:
+	$(MAKE) install DESTDIR=$(CURDIR)/debian/tmp PREFIX=/usr BINDIR=/usr/bin \
+	  LIBDIR=/usr/lib MANDIR=/usr/share/man DOCDIR=/usr/share/doc/peaseblossom
+	# the copyright file has the licence
+	rm debian/tmp/usr/share/doc/peaseblossom/LICENSE
+	$(MAKE) install-vax DESTDIR=$(CURDIR)/debian/tmp PREFIX=/usr BINDIR=/usr/bin \
+	  LIBDIR=/usr/lib DATADIR=/usr/share VAXKITDIR=/usr/share/peaseblossom/vax \
+	  VAXDOCDIR=/usr/share/doc/peaseblossom-vax
+
+# The checks need the installed tree, and dh runs dh_auto_test before
+# dh_auto_install: they run after it instead. What a user does with the
+# installed poc: programs at both size models, -g, shared poc-rtl, a
+# library of one's own, poc(1); then programs for the VAX built with it,
+# and the VAX libraries alone.
+override_dh_auto_test:
+
+execute_after_dh_auto_install:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	test/install/check.sh $(CURDIR)/debian/tmp/usr/bin/poc $(CURDIR)/debian/check-install
+	test/install/check-vax.sh $(CURDIR)/debian/tmp/usr/bin/poc $(CURDIR)/debian/check-install-vax \
+	  tools/bootstrap/vax-kit/check $(CURDIR)/debian/tmp/usr/share/peaseblossom/vax \
+	  $(CURDIR)/debian/tmp/usr/share/doc/peaseblossom-vax
+endif
+
+# poc-rtl's -g copies keep their debugging information, and its other
+# copies are as poc built them; poc itself has none to split off
+override_dh_strip:
+	dh_strip --no-automatic-dbgsym -X/usr/lib/poc/
+
+override_dh_dwz:
+
+override_dh_makeshlibs:
+	dh_makeshlibs -X/usr/lib/poc/

@@ -18,6 +18,7 @@ be on `PATH`, at run time too. Any clang from 19 on does.
 | System | Tested on | Install first |
 |---|---|---|
 | Linux | Fedora 44, x86_64 | `clang`, `make` (`dnf install clang make`) |
+| Linux | Debian 13 (trixie), amd64 and arm64 | `clang`, `make` (`apt install clang make`) |
 | FreeBSD | 15.1, amd64 and arm64 | `gmake` (clang is in the base system) |
 | OpenBSD | 7.9, i386 and amd64 | `gmake` (clang is in the base system) |
 | NetBSD | 11.0, amd64 and i386 | `clang` and `gmake` from pkgsrc (`pkgin install clang gmake`) |
@@ -99,8 +100,8 @@ directory needs no root.
 
 The BSDs' packages (section 5) are built from this same tarball, so on
 FreeBSD, OpenBSD and NetBSD it is checked at every release. Among Linux
-distributions only Fedora is checked. The build is the same on any
-other, but nothing has tried one.
+distributions only Fedora and Debian are checked. The build is the same on
+any other, but nothing has tried one.
 
 ## 3. From the git repository
 
@@ -203,13 +204,14 @@ Some ways to use them:
 
 `packaging/` has a package for each system, each built from the release
 tarball. They install poc into the system's usual places (`/usr/bin` and
-`/usr/lib/poc` on Fedora, `/usr/local` on FreeBSD and OpenBSD, `/usr/pkg` on
-NetBSD), and need clang: the base system's on FreeBSD and OpenBSD, a
-dependency on Fedora and NetBSD.
+`/usr/lib/poc` on Fedora and Debian, `/usr/local` on FreeBSD and OpenBSD,
+`/usr/pkg` on NetBSD), and need clang: the base system's on FreeBSD and
+OpenBSD, a dependency on Fedora, Debian and NetBSD.
 
 | System | Package | Built with |
 |---|---|---|
 | Fedora | `packaging/fedora/peaseblossom.spec` | `rpmbuild` or `mock` |
+| Debian | `packaging/debian`, copied into the unpacked tarball as `debian/` | `dpkg-buildpackage` |
 | FreeBSD | `packaging/freebsd/lang/peaseblossom` | the ports tree, or `poudriere` |
 | OpenBSD | `packaging/openbsd/lang/peaseblossom` | the ports tree (`mystuff/`) |
 | NetBSD | `packaging/pkgsrc/lang/peaseblossom` | pkgsrc |
@@ -225,11 +227,14 @@ from a release (below) or built locally; `doc/developer/DEVELOPER.md`,
 Each release also carries a package for each system in section 1, built
 from its tarball and named for the system release and architecture it is
 for. Check the file against the release's `SHA256SUMS`, as for the
-tarball (section 2), then install it as root:
+tarball (section 2), then install it as root. (Debian's packages are
+carried from the release after 0.11.2 on.)
 
 | System | Install |
 |---|---|
 | Fedora 44, x86_64 | `dnf install ./peaseblossom-0.11.2-1.fc44.x86_64.rpm` |
+| Debian 13, amd64 | `apt install ./peaseblossom-0.11.2-1-debian13-amd64.deb` |
+| Debian 13, arm64 | `apt install ./peaseblossom-0.11.2-1-debian13-arm64.deb` |
 | FreeBSD 15.1, amd64 | `pkg add ./peaseblossom-0.11.2-freebsd15.1-amd64.pkg` |
 | FreeBSD 15.1, arm64 | `pkg add ./peaseblossom-0.11.2-freebsd15.1-arm64.pkg` |
 | OpenBSD 7.9, i386 or amd64 | `pkg_add -D unsigned ./peaseblossom-0.11.2.tgz`, under that name (below) |
@@ -282,7 +287,8 @@ the installed poc alone; without pandoc, it leaves the guide out and
 says so.
 
 The package `peaseblossom-vax` installs the same, for each system of
-section 5: a subpackage of the Fedora spec and of the OpenBSD port
+section 5: a subpackage of the Fedora spec, of the Debian package
+(`peaseblossom-vax-<version>-1-debian13-all.deb`) and of the OpenBSD port
 (`-vax`), and a port of its own for FreeBSD and pkgsrc,
 `lang/peaseblossom-vax`. It needs the `peaseblossom` package of its own
 version, since poc refuses a library another version wrote. A release

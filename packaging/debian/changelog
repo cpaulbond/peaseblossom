@@ -1,0 +1,7 @@
+peaseblossom (0.11.2-1) unstable; urgency=medium
+
+  * First Debian package, for trixie on amd64 and arm64: poc and poc-rtl
+    (peaseblossom) and the VAX/VMS target (peaseblossom-vax), from the
+    release tarball's seed, as the Fedora RPM.
+
+ -- T. Kurt Bond <tkurtbond@gmail.com>  Sat, 14 Nov 2026 12:00:00 -0500

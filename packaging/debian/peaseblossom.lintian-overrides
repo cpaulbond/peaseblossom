@@ -1,0 +1,6 @@
+# poc-rtl is installed as poc built it, as in the Fedora package: the -g
+# copies keep their debugging information on purpose, and the others are
+# what poc links programs with, not the system's libraries
+unstripped-binary-or-object [usr/lib/poc/*/libpoc-rtl.so]
+# packages made with each release, not uploaded to Debian
+initial-upload-closes-no-bugs
