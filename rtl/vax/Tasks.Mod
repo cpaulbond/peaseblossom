@@ -21,9 +21,9 @@ MODULE Tasks;
      An override of Run must be exported, as the base procedure is.
 
      SCHEDULING. Nothing preempts: a task runs until it makes a call that
-     can block (Yield, Join, Wait, Lock, Send, Receive, Select), and only
-     then may another run, so code between two such calls is atomic. A
-     task that blocks switches straight to the first ready task, in the
+     can block (Yield, Join, Wait, Lock, Send, Receive, Select, Sleep,
+     Await, AwaitReadable, AwaitWritable), and only then may another
+     run, so code between two such calls is atomic. A task that blocks switches straight to the first ready task, in the
      order they became ready; Yield puts the running task at the end. A
      blocking call, I/O included, of any other module stops every task.
      The program ends when the main module's body ends: tasks still
@@ -42,14 +42,35 @@ MODULE Tasks;
      After Close, Receive takes the messages still held, then returns
      FALSE.
 
+     TIME. Sleep and After wait at least their time, and longer when the
+     clock ticks coarsely (10 ms on OpenBSD, NetBSD and VAX/VMS) or other
+     tasks keep running: while tasks are ready the clock is read only
+     every 256 picks of a task to run.
+
+     EVENTS. An Event is how a signal handler, an AST, or a replaced idle
+     step's callback wakes a task: Post sets a flag, which the scheduler
+     sees at its next pick, and wakes the idle wait. Make the Event a
+     global variable or part of a heap record, so that it outlives the
+     Await. Platform.SetInterruptHandler's handler or a $QIO's AST may
+     Post; neither may call anything else of Tasks.
+
+     WAITING. When no task is ready, Tasks waits: on POSIX in poll, for
+     the descriptors tasks await and a pipe that Post writes to; on
+     VAX/VMS in $HIBER, which Post's $WAKE ends. SetIdleStep replaces
+     that wait, for a toolkit's event loop (doc/developer/tasks.md,
+     decision 10). On POSIX, while tasks are ready and some task awaits
+     a descriptor, descriptors are polled about every millisecond.
+
      TRAPS. When no task is ready and nothing can make one ready, the
-     program traps (19), "all tasks are blocked". Misuse traps (20): an
-     Unlock of a mutex the running task does not hold, a Join of the
-     running task, a Send on a closed channel (also one waiting when the
-     channel is closed), a Close of a channel already closed, a Start of a
-     task already started, NewChannel with a negative capacity. A call
-     that blocks traps (17) in a finalizer, as Transfer does there; on
-     LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
+     program traps (19), "all tasks are blocked": none is ready, sleeping,
+     in Await, or awaiting a descriptor. Misuse traps (20): an Unlock of
+     a mutex the running task does not hold, a Join of the running task,
+     a Send on a closed channel (also one waiting when the channel is
+     closed), a Close of a channel already closed, a Start of a task
+     already started, NewChannel with a negative capacity, AwaitReadable
+     or AwaitWritable of a negative descriptor, or on VAX/VMS at all. A
+     call that blocks traps (17) in a finalizer, as Transfer does there;
+     on LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
      level is undefined.
 
      RULES the program keeps, which nothing checks:
@@ -59,12 +80,19 @@ MODULE Tasks;
      - A task blocked for good keeps its stack until the program ends: one
        waiting on a channel nothing else can reach is a leak. *)
 
-  IMPORT Coroutines, TaskWaiting;
+  IMPORT SYSTEM, Coroutines, TaskWaiting;
 
   CONST
     DefaultStackSize* = Coroutines.DefaultStackSize;
     (* a task's states *)
     notStarted = 0; ready = 1; running = 2; blocked = 3; finished = 4;
+    (* while tasks are ready and a timer is pending or a task waits for a
+       descriptor, every pollEvery picks the clock is read: due timers
+       expire, and when pollInterval microseconds have passed since the
+       last poll, descriptors are polled without waiting (decision 9) *)
+    pollEvery = 256; pollInterval = 1000;
+    (* the longest timeout passed to the idle step, in ms *)
+    longestTimeout = 7FFFFFFFH;
 
   TYPE
     Task* = POINTER TO TaskDesc;
@@ -90,6 +118,15 @@ MODULE Tasks;
     END;
     WaiterQueue = RECORD first, last: Waiter END;
 
+    (* a Sleep's (task) or an After's (channel), in the list of timers *)
+    Timer = POINTER TO TimerDesc;
+    TimerDesc = RECORD
+      deadline: HUGEINT;   (* TaskWaiting.Now's microseconds *)
+      task: Task;
+      channel: Channel;
+      next: Timer
+    END;
+
     TaskDesc* = RECORD
       coroutine: Coroutines.Coroutine;
       state: INTEGER;
@@ -97,11 +134,22 @@ MODULE Tasks;
       joiners: TaskQueue;
       waiter: Waiter;      (* its own, for a Send or a Receive *)
       spares: Waiter;      (* for Select *)
-      fired: Waiter        (* the waiter that woke it; NIL while it waits *)
+      fired: Waiter;       (* the waiter that woke it; NIL while it waits *)
+      timer: Timer;        (* its own, for Sleep *)
+      event: SYSTEM.ADDRESS;  (* the flag of the Event it awaits *)
+      descriptor: LONGINT; (* the one it awaits *)
+      forWriting: BOOLEAN
     END;
 
     Condition* = RECORD waiting: TaskQueue END;
     Mutex* = RECORD holder: Task; waiting: TaskQueue END;
+
+    (* set by Post, which a signal handler or an AST may call *)
+    Event* = RECORD posted: BOOLEAN END;
+
+    (* called instead of the idle wait (decision 10) with the longest time
+       to wait in ms, -1 for no limit *)
+    IdleStep* = PROCEDURE (timeout: LONGINT);
 
     Messages = POINTER TO ARRAY OF Message;
     ChannelDesc* = RECORD
@@ -117,6 +165,18 @@ MODULE Tasks;
     (* a task that has ended, whose stack the next task to run gives back:
        Coroutines.Free of the running coroutine traps *)
     endedTask: Task;
+    timers: Timer;          (* the nearest deadline first *)
+    awaiting: TaskQueue;    (* tasks in Await *)
+    watching: TaskQueue;    (* tasks in AwaitReadable or AwaitWritable *)
+    watchCount: LONGINT;
+    picks: LONGINT;         (* since the clock was last read *)
+    lastPoll: HUGEINT;
+    idleStep: IdleStep;
+    (* written by Post in a signal handler or an AST, so read and written
+       only by SYSTEM.GET and SYSTEM.PUT, which the compiler does not keep
+       in registers: whether an event was posted since the last harvest,
+       and whether the idle wait is about to start or going on *)
+    anyPosted, idle: BOOLEAN;
 
   (* The body: what the task does. Returning ends the task. *)
   PROCEDURE (t: Task) Run*;
@@ -154,13 +214,132 @@ MODULE Tasks;
     Append(q, current)
   END WaitIn;
 
-  (* The next task to run *)
-  PROCEDURE NextReady(): Task;
-    VAR t: Task;
+  (* Makes ready the tasks whose events were posted, in the order they
+     began to await *)
+  PROCEDURE Harvest;
+    VAR t, previous, next: Task; posted: BOOLEAN;
   BEGIN
-    t := Remove(runQueue);
-    IF t = NIL THEN TaskWaiting.Deadlock END;
-    RETURN t
+    SYSTEM.PUT(SYSTEM.ADR(anyPosted), FALSE);
+    previous := NIL; t := awaiting.first;
+    WHILE t # NIL DO
+      next := t.next;
+      SYSTEM.GET(t.event, posted);
+      IF posted THEN
+        SYSTEM.PUT(t.event, FALSE);
+        IF previous = NIL THEN awaiting.first := next ELSE previous.next := next END;
+        IF awaiting.last = t THEN awaiting.last := previous END;
+        t.event := 0;
+        MakeReady(t)
+      ELSE previous := t
+      END;
+      t := next
+    END
+  END Harvest;
+
+  PROCEDURE ^ Put(ch: Channel; m: Message): BOOLEAN;
+
+  (* Ends the timers whose deadlines are not after now *)
+  PROCEDURE ExpireTimers(now: HUGEINT);
+    VAR t: Timer; sent: BOOLEAN;
+  BEGIN
+    WHILE (timers # NIL) & (timers.deadline <= now) DO
+      t := timers; timers := t.next; t.next := NIL;
+      IF t.task # NIL THEN MakeReady(t.task)
+      ELSIF ~t.channel.closed THEN sent := Put(t.channel, NIL)
+      END
+    END
+  END ExpireTimers;
+
+  PROCEDURE AddTimer(t: Timer);
+    VAR p: Timer;
+  BEGIN
+    IF (timers = NIL) OR (t.deadline < timers.deadline) THEN
+      t.next := timers; timers := t
+    ELSE
+      p := timers;
+      WHILE (p.next # NIL) & (p.next.deadline <= t.deadline) DO p := p.next END;
+      t.next := p.next; p.next := t
+    END
+  END AddTimer;
+
+  (* The idle step: waits for the nearest timer, a descriptor a task
+     awaits, or a Post, or, unless wait, only looks *)
+  PROCEDURE Idle(wait: BOOLEAN);
+    VAR timeout: LONGINT; remaining: HUGEINT; t, previous, next: Task;
+      i: LONGINT; posted: BOOLEAN;
+  BEGIN
+    IF ~wait THEN timeout := 0
+    ELSIF timers = NIL THEN timeout := -1
+    ELSE
+      remaining := timers.deadline - TaskWaiting.Now();
+      IF remaining <= 0 THEN timeout := 0
+      ELSIF remaining >= longestTimeout * 1000 - 999 THEN timeout := longestTimeout
+      ELSE timeout := SHORT((remaining + 999) DIV 1000)
+      END
+    END;
+    TaskWaiting.Clear;
+    t := watching.first;
+    WHILE t # NIL DO TaskWaiting.Add(t.descriptor, t.forWriting); t := t.next END;
+    (* a Post from here on wakes the wait *)
+    SYSTEM.PUT(SYSTEM.ADR(idle), TRUE);
+    SYSTEM.GET(SYSTEM.ADR(anyPosted), posted);
+    IF posted THEN timeout := 0 END;
+    IF (idleStep # NIL) & (timeout # 0) THEN
+      (* it waits; a look without waiting then finds what is ready *)
+      idleStep(timeout);
+      timeout := 0
+    END;
+    TaskWaiting.Wait(timeout);
+    SYSTEM.PUT(SYSTEM.ADR(idle), FALSE);
+    lastPoll := TaskWaiting.Now();
+    previous := NIL; t := watching.first; i := 0;
+    WHILE t # NIL DO
+      next := t.next;
+      IF TaskWaiting.Ready(i) THEN
+        IF previous = NIL THEN watching.first := next ELSE previous.next := next END;
+        IF watching.last = t THEN watching.last := previous END;
+        DEC(watchCount);
+        MakeReady(t)
+      ELSE previous := t
+      END;
+      t := next; INC(i)
+    END
+  END Idle;
+
+  (* Reads the clock: due timers expire, and descriptors are looked at if
+     a task waits for one and pollInterval has passed *)
+  PROCEDURE Look;
+    VAR now: HUGEINT;
+  BEGIN
+    now := TaskWaiting.Now();
+    IF timers # NIL THEN ExpireTimers(now) END;
+    IF (watchCount > 0) & (now - lastPoll >= pollInterval) THEN Idle(FALSE) END
+  END Look;
+
+  (* The next task to run, waiting in the idle step while none is ready *)
+  PROCEDURE NextReady(): Task;
+    VAR posted: BOOLEAN;
+  BEGIN
+    LOOP
+      SYSTEM.GET(SYSTEM.ADR(anyPosted), posted);
+      IF posted THEN Harvest END;
+      IF runQueue.first # NIL THEN
+        IF (timers # NIL) OR (watchCount > 0) THEN
+          INC(picks);
+          IF picks >= pollEvery THEN picks := 0; Look END
+        END;
+        RETURN Remove(runQueue)
+      END;
+      picks := 0;
+      IF timers # NIL THEN ExpireTimers(TaskWaiting.Now()) END;
+      IF runQueue.first = NIL THEN
+        IF (timers = NIL) & (watchCount = 0) & (awaiting.first = NIL) THEN
+          TaskWaiting.Deadlock
+        END;
+        Idle(TRUE);
+        IF timers # NIL THEN ExpireTimers(TaskWaiting.Now()) END
+      END
+    END
   END NextReady;
 
   PROCEDURE FreeFinished;
@@ -285,6 +464,93 @@ MODULE Tasks;
     m.holder := t;
     IF t # NIL THEN MakeReady(t) END
   END Unlock;
+
+  (* Waits at least milliseconds; Yield when it is not positive *)
+  PROCEDURE Sleep*(milliseconds: LONGINT);
+    VAR t: Timer; delay: HUGEINT;
+  BEGIN
+    IF milliseconds <= 0 THEN Yield
+    ELSE
+      IF current.timer = NIL THEN NEW(current.timer); current.timer.task := current END;
+      t := current.timer;
+      delay := milliseconds;
+      t.deadline := TaskWaiting.Now() + delay * 1000;
+      AddTimer(t);
+      current.state := blocked;
+      Block
+    END
+  END Sleep;
+
+  (* Events *)
+
+  (* Waits until e is posted, at once if it has been since it was last
+     awaited; then it is not posted. A Post wakes one task awaiting e,
+     the one that has waited longest. *)
+  PROCEDURE Await*(VAR e: Event);
+    VAR posted: BOOLEAN;
+  BEGIN
+    SYSTEM.GET(SYSTEM.ADR(e.posted), posted);
+    IF posted THEN SYSTEM.PUT(SYSTEM.ADR(e.posted), FALSE)
+    ELSE
+      current.event := SYSTEM.ADR(e.posted);
+      WaitIn(awaiting);
+      Block
+    END
+  END Await;
+
+  (* Posts e: wakes a task awaiting it, or the next to await it. It only
+     sets flags, so a signal handler or an AST may call it. Posts before
+     e is awaited count as one. *)
+  PROCEDURE Post*(VAR e: Event);
+    VAR waiting: BOOLEAN;
+  BEGIN
+    SYSTEM.PUT(SYSTEM.ADR(e.posted), TRUE);
+    SYSTEM.PUT(SYSTEM.ADR(anyPosted), TRUE);
+    SYSTEM.GET(SYSTEM.ADR(idle), waiting);
+    IF waiting THEN TaskWaiting.Wake END
+  END Post;
+
+  (* Makes Tasks call step instead of its own wait when no task is ready
+     (decision 10), NIL its own again. step(timeout) waits at most timeout
+     ms, -1 for no limit, and must return when WakeDescriptor() is
+     readable and when a descriptor a task awaits is ready; it runs on
+     the stack of the task that idles. *)
+  PROCEDURE SetIdleStep*(step: IdleStep);
+  BEGIN
+    idleStep := step
+  END SetIdleStep;
+
+  (* Descriptors, POSIX only: a VAX/VMS program waits for a $QIO's AST
+     that posts an event *)
+
+  PROCEDURE AwaitDescriptor(fd: LONGINT; forWriting: BOOLEAN);
+  BEGIN
+    TaskWaiting.CheckDescriptor(fd);
+    current.descriptor := fd; current.forWriting := forWriting;
+    WaitIn(watching); INC(watchCount);
+    Block
+  END AwaitDescriptor;
+
+  (* Waits until fd can be read without blocking (POSIX's poll), or is at
+     its end or in error. A regular file always can. *)
+  PROCEDURE AwaitReadable*(fd: LONGINT);
+  BEGIN
+    AwaitDescriptor(fd, FALSE)
+  END AwaitReadable;
+
+  (* Waits until fd can be written to without blocking, or is in error *)
+  PROCEDURE AwaitWritable*(fd: LONGINT);
+  BEGIN
+    AwaitDescriptor(fd, TRUE)
+  END AwaitWritable;
+
+  (* The read end of the pipe that a Post during the idle step writes to,
+     for a replaced step to watch; -1 on VAX/VMS, or if it could not be
+     made *)
+  PROCEDURE WakeDescriptor*(): LONGINT;
+  BEGIN
+    RETURN TaskWaiting.WakeDescriptor()
+  END WakeDescriptor;
 
   (* Channels *)
 
@@ -428,6 +694,23 @@ MODULE Tasks;
     w := FirstWaiting(ch.senders);
     WHILE w # NIL DO Fire(w, FALSE); w := FirstWaiting(ch.senders) END
   END Close;
+
+  (* A channel of capacity 1 that gets one message, NIL, at least
+     milliseconds from now: at once when that is not positive. A channel
+     closed by then gets none. *)
+  PROCEDURE After*(milliseconds: LONGINT): Channel;
+    VAR ch: Channel; t: Timer; delay: HUGEINT;
+  BEGIN
+    ch := NewChannel(1);
+    IF milliseconds <= 0 THEN Hold(ch, NIL)
+    ELSE
+      NEW(t); t.channel := ch;
+      delay := milliseconds;
+      t.deadline := TaskWaiting.Now() + delay * 1000;
+      AddTimer(t)
+    END;
+    RETURN ch
+  END After;
 
   PROCEDURE SpareWaiter(): Waiter;
     VAR w: Waiter;

@@ -3260,9 +3260,11 @@ END Strings.
 
 ```text
 What Tasks needs that differs between the systems (doc/developer/
-tasks.md, decision 1), here for POSIX: the traps 19 and 20, with
-their texts in TaskWaiting.c. rtl/vax/TaskWaiting.Mod has the same
-interface for VAX/VMS. For Tasks only.
+tasks.md, decision 1), here for POSIX: the clock, the idle wait
+(poll on the descriptors tasks wait for and a self-pipe), the wake a
+signal handler gives through the self-pipe, and the traps 19 and 20,
+with their texts in TaskWaiting.c. rtl/vax/TaskWaiting.Mod has the
+same interface for VAX/VMS. For Tasks only.
 ```
 
 ```oberon
@@ -3281,6 +3283,34 @@ MODULE TaskWaiting;
 
   (* Trap 20 with the text of case which, one of the constants above *)
   PROCEDURE Misuse*(which: SYSTEM.INT32);
+
+  (* A monotonic clock, in microseconds *)
+  PROCEDURE Now*(): HUGEINT;
+
+  (* Ends a Wait that is going on or about to start; safe in a signal
+     handler (write is async-signal-safe) *)
+  PROCEDURE Wake*();
+
+  (* The self-pipe's read end, which is readable after a Wake; -1 when
+     it could not be made *)
+  PROCEDURE WakeDescriptor*(): LONGINT;
+
+  (* Traps (20) unless fd can be waited for *)
+  PROCEDURE CheckDescriptor*(fd: LONGINT);
+
+  (* Starts a list of descriptors for Wait *)
+  PROCEDURE Clear*();
+
+  (* Adds fd to the list, waited for until it can be written to (forWriting)
+     or read *)
+  PROCEDURE Add*(fd: LONGINT; forWriting: BOOLEAN);
+
+  (* Waits up to timeout ms (-1: no limit, 0: not at all) for a
+     descriptor of the list to be ready or a Wake; empties the self-pipe *)
+  PROCEDURE Wait*(timeout: LONGINT);
+
+  (* Whether the i-th descriptor Added since Clear was found ready by Wait *)
+  PROCEDURE Ready*(i: LONGINT): BOOLEAN;
 END TaskWaiting.
 ```
 
@@ -3309,9 +3339,9 @@ stack is given back. The main program is a task too.
 An override of Run must be exported, as the base procedure is.
 
 SCHEDULING. Nothing preempts: a task runs until it makes a call that
-can block (Yield, Join, Wait, Lock, Send, Receive, Select), and only
-then may another run, so code between two such calls is atomic. A
-task that blocks switches straight to the first ready task, in the
+can block (Yield, Join, Wait, Lock, Send, Receive, Select, Sleep,
+Await, AwaitReadable, AwaitWritable), and only then may another
+run, so code between two such calls is atomic. A task that blocks switches straight to the first ready task, in the
 order they became ready; Yield puts the running task at the end. A
 blocking call, I/O included, of any other module stops every task.
 The program ends when the main module's body ends: tasks still
@@ -3330,14 +3360,35 @@ message from a sender to a receiver; one of capacity n holds up to n.
 After Close, Receive takes the messages still held, then returns
 FALSE.
 
+TIME. Sleep and After wait at least their time, and longer when the
+clock ticks coarsely (10 ms on OpenBSD, NetBSD and VAX/VMS) or other
+tasks keep running: while tasks are ready the clock is read only
+every 256 picks of a task to run.
+
+EVENTS. An Event is how a signal handler, an AST, or a replaced idle
+step's callback wakes a task: Post sets a flag, which the scheduler
+sees at its next pick, and wakes the idle wait. Make the Event a
+global variable or part of a heap record, so that it outlives the
+Await. Platform.SetInterruptHandler's handler or a $QIO's AST may
+Post; neither may call anything else of Tasks.
+
+WAITING. When no task is ready, Tasks waits: on POSIX in poll, for
+the descriptors tasks await and a pipe that Post writes to; on
+VAX/VMS in $HIBER, which Post's $WAKE ends. SetIdleStep replaces
+that wait, for a toolkit's event loop (doc/developer/tasks.md,
+decision 10). On POSIX, while tasks are ready and some task awaits
+a descriptor, descriptors are polled about every millisecond.
+
 TRAPS. When no task is ready and nothing can make one ready, the
-program traps (19), "all tasks are blocked". Misuse traps (20): an
-Unlock of a mutex the running task does not hold, a Join of the
-running task, a Send on a closed channel (also one waiting when the
-channel is closed), a Close of a channel already closed, a Start of a
-task already started, NewChannel with a negative capacity. A call
-that blocks traps (17) in a finalizer, as Transfer does there; on
-LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
+program traps (19), "all tasks are blocked": none is ready, sleeping,
+in Await, or awaiting a descriptor. Misuse traps (20): an Unlock of
+a mutex the running task does not hold, a Join of the running task,
+a Send on a closed channel (also one waiting when the channel is
+closed), a Close of a channel already closed, a Start of a task
+already started, NewChannel with a negative capacity, AwaitReadable
+or AwaitWritable of a negative descriptor, or on VAX/VMS at all. A
+call that blocks traps (17) in a finalizer, as Transfer does there;
+on LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
 level is undefined.
 
 RULES the program keeps, which nothing checks:
@@ -3360,6 +3411,13 @@ MODULE Tasks;
     TaskDesc* = RECORD  END;
     Condition* = RECORD  END;
     Mutex* = RECORD  END;
+
+    (* set by Post, which a signal handler or an AST may call *)
+    Event* = RECORD  END;
+
+    (* called instead of the idle wait (decision 10) with the longest time
+       to wait in ms, -1 for no limit *)
+    IdleStep* = PROCEDURE(timeout: LONGINT);
     ChannelDesc* = RECORD  END;
 
   (* The body: what the task does. Returning ends the task. *)
@@ -3397,6 +3455,38 @@ MODULE Tasks;
   (* Gives m back, to the task that has waited longest, if any *)
   PROCEDURE Unlock*(VAR m: Mutex);
 
+  (* Waits at least milliseconds; Yield when it is not positive *)
+  PROCEDURE Sleep*(milliseconds: LONGINT);
+
+  (* Waits until e is posted, at once if it has been since it was last
+     awaited; then it is not posted. A Post wakes one task awaiting e,
+     the one that has waited longest. *)
+  PROCEDURE Await*(VAR e: Event);
+
+  (* Posts e: wakes a task awaiting it, or the next to await it. It only
+     sets flags, so a signal handler or an AST may call it. Posts before
+     e is awaited count as one. *)
+  PROCEDURE Post*(VAR e: Event);
+
+  (* Makes Tasks call step instead of its own wait when no task is ready
+     (decision 10), NIL its own again. step(timeout) waits at most timeout
+     ms, -1 for no limit, and must return when WakeDescriptor() is
+     readable and when a descriptor a task awaits is ready; it runs on
+     the stack of the task that idles. *)
+  PROCEDURE SetIdleStep*(step: IdleStep);
+
+  (* Waits until fd can be read without blocking (POSIX's poll), or is at
+     its end or in error. A regular file always can. *)
+  PROCEDURE AwaitReadable*(fd: LONGINT);
+
+  (* Waits until fd can be written to without blocking, or is in error *)
+  PROCEDURE AwaitWritable*(fd: LONGINT);
+
+  (* The read end of the pipe that a Post during the idle step writes to,
+     for a replaced step to watch; -1 on VAX/VMS, or if it could not be
+     made *)
+  PROCEDURE WakeDescriptor*(): LONGINT;
+
   (* A channel that holds up to capacity messages; 0 makes each Send wait
      for a receiver *)
   PROCEDURE NewChannel*(capacity: LONGINT): Channel;
@@ -3418,6 +3508,11 @@ MODULE Tasks;
   (* Closes ch: no more can be sent. Its receivers waiting get FALSE, and
      its senders waiting trap (20). *)
   PROCEDURE Close*(ch: Channel);
+
+  (* A channel of capacity 1 that gets one message, NIL, at least
+     milliseconds from now: at once when that is not positive. A channel
+     closed by then gets none. *)
+  PROCEDURE After*(milliseconds: LONGINT): Channel;
 
   (* Receives a message in m from whichever channel of from has one first,
      waiting for one, and returns its index; the first in from's order when

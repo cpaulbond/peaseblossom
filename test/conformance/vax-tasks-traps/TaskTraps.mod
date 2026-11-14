@@ -5,7 +5,8 @@ MODULE TaskTraps;
      One trap of Tasks per run, chosen by the argument, with an object's
      finalizer registered, which every one of them runs: 19 (all tasks
      blocked), each case of 20 (misuse), and 17 (a call that blocks in a
-     finalizer, with another task ready). *)
+     finalizer, with another task ready). Case 14 is VMS's own misuse,
+     AwaitReadable, which has no descriptors to wait for. *)
   IMPORT SYSTEM, Tasks, GarbageCollectedHeap, Modules, Out;
 
   TYPE
@@ -106,6 +107,7 @@ BEGIN
   | 13: NEW(idle); Tasks.Start(idle, Tasks.DefaultStackSize);
         DropFinalizedObject; Scrub;
         GarbageCollectedHeap.Collect
+  | 14: Tasks.AwaitReadable(0)
   END;
   Out.String("not reached"); Out.Ln
 END TaskTraps.

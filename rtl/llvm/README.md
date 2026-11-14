@@ -130,11 +130,15 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
 - `Tasks.Mod` - cooperative tasks over `Coroutines`
   (`doc/developer/tasks.md`): a task is an extension of `TaskDesc` with
   an exported `Run`; a FIFO run queue, `Yield`, `Join`, Mesa conditions,
-  mutexes, channels of extensible records and a receive-only `Select`.
+  mutexes, channels of extensible records and a receive-only `Select`;
+  `Sleep`, `After`, events a signal handler may `Post`, `AwaitReadable`
+  and `AwaitWritable`, and an idle step `SetIdleStep` replaces.
   Nothing preempts. The same file as `rtl/vax/Tasks.Mod` (fixture
   `tasks-same-source`); what differs by system is in `TaskWaiting`.
-- `TaskWaiting.Mod`, `TaskWaiting.c` - `Tasks`' system part: so far the
-  traps' texts, 19 (all tasks blocked) and 20 (misuse, by case).
+- `TaskWaiting.Mod`, `TaskWaiting.c` - `Tasks`' system part: the
+  monotonic clock, the idle wait (`poll` on the descriptors tasks wait
+  for and a self-pipe, which `Wake` writes to), and the traps' texts, 19
+  (all tasks blocked) and 20 (misuse, by case).
 
 Written in ordinary Oberon-2 over `SYSTEM.ADDRESS` (no pointer variables),
 except the C parts (`Platform.c`, `Coroutines.c`, `TaskWaiting.c`), so

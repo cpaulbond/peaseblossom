@@ -55,3 +55,7 @@ a finalizer yields
 finalized 1
 status: %X1000008A
 Transfer in a finalizer
+== 14
+finalized 1
+status: %X100000A2
+AwaitReadable or AwaitWritable on VAX/VMS

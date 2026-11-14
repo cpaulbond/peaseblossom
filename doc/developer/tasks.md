@@ -386,6 +386,22 @@ on POSIX and VMS, and `AwaitReadable`/`AwaitWritable` on POSIX. Fixtures:
 - `vax-tasks-time`, `vax-tasks-events`: the same on the guest, with an AST
   from `Timers.After` and a mailbox `$QIO`.
 
+Done 2026-11-14. Decision 9's early look every 256th pick takes in the
+clock too while a timer is pending, so a sleeper wakes on time beside
+tasks that only yield (`llvm-tasks-time`'s spinner). A task in `Await` is
+never a deadlock (19), since a signal handler or an AST may post. On VMS
+`AwaitReadable` and `AwaitWritable` are trap 20's case 7; POSIX's case 6
+is a negative descriptor. The VMS clock is `$GETTIM`'s system time, not a
+monotonic one; a failed `$SETIMR` makes the scheduler look again at once
+rather than hang, and on POSIX a failed `pipe()` caps each wait at 10 ms.
+`llvm-tasks-events`' C part (a writing child, a signalling child) is in
+`part/`, since the conformance tree ignores and deletes `*.c`.
+`vax-tasks-time` sleeps ten times as long as `llvm-tasks-time` (the VAX's
+clock ticks every 10 ms) and builds `Timers` from `rtl/vax/vmslib` and
+STARLET's source; `vax-tasks-events` declares its system services itself,
+as the probe did. A text with a `/` in `PocRtl.mar` is delimited by
+quotes (MACRO-32 took `VAX/VMS`'s for the end of `.ASCIC`).
+
 ### Phase 11: Standard input
 
 `TaskInput` on both back ends. Two questions from Phase 7.1 (survey 10.1)

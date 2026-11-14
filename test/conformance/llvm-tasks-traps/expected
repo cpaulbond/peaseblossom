@@ -59,3 +59,11 @@ a signal handler yields
 Transfer in a signal handler
 finalized 1
 exit=17
+== 15
+AwaitReadable or AwaitWritable of a negative descriptor
+finalized 1
+exit=20
+== 16
+AwaitReadable or AwaitWritable of a negative descriptor
+finalized 1
+exit=20

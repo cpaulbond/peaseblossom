@@ -177,6 +177,10 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   (fixture `tasks-same-source`). It switches with
   `Coroutines.TransferForTasks`, which leaves out `Transfer`'s check for
   AST level (decision 13), so a call that blocks in an AST is undefined.
-- `TaskWaiting.Mod` - `Tasks`' system part: so far the traps 19 (all
-  tasks blocked) and 20 (misuse, by case), through `POC_TRAP`, whose
-  texts are in `PocRtl.mar`.
+- `TaskWaiting.Mod` - `Tasks`' system part: the clock (`$GETTIM`), the
+  idle wait (`$HIBER`, with a `$SETIMR` of its own for a timeout), the
+  wake an AST gives (`$WAKE`), and the traps 19 (all tasks blocked) and
+  20 (misuse, by case), through `POC_TRAP`, whose texts are in
+  `PocRtl.mar`. VMS has no descriptors to wait for: `AwaitReadable` and
+  `AwaitWritable` trap (20), and an I/O wait is a `$QIO` whose AST posts
+  an event.

@@ -1,0 +1,16 @@
+a wake descriptor
+Sleep(50): the step called, first timeout 41 to 50, slept at least 50 ms
+Await: 1 call, timeout -1
+Await after a Post: 0 calls
+the spinner saw the waker
+while a task was ready: 0 calls
+with no step: 0 calls, slept at least 20 ms
+== -OC
+a wake descriptor
+Sleep(50): the step called, first timeout 41 to 50, slept at least 50 ms
+Await: 1 call, timeout -1
+Await after a Post: 0 calls
+the spinner saw the waker
+while a task was ready: 0 calls
+with no step: 0 calls, slept at least 20 ms
+exit=0

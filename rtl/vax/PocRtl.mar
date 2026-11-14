@@ -54,9 +54,10 @@
 ; word (doc/developer/coroutines.md, decision 9); and Tasks' 19 and 20,
 ; 20's case n in the high word (doc/developer/tasks.md, decision 6).
 ; Slots 16 to 20 are the codes', 17's and 20's case 0 in 17 and 20; 21
-; and 22 CHR's and VAL's; 23 to 27 17's cases 1 to 5; 28 to 32 20's
-; the table in POC_ADDR, the constants that hold addresses, so that
-; POC_CONST stays shareable in a shareable image (section 18, proposal 5)
+; and 22 CHR's and VAL's; 23 to 27 17's cases 1 to 5; 28 to 34 20's
+; cases 1 to 7. The table is in POC_ADDR, the constants that hold
+; addresses, so that POC_CONST stays shareable in a shareable image
+; (section 18, proposal 5). A text with a "/" is delimited by quotes.
 	.PSECT	POC_ADDR
 POC_TRAP_TEXTS:
 	.ADDRESS	POC_TX_0, POC_TX_0, POC_TX_2, POC_TX_3, POC_TX_4
@@ -68,7 +69,7 @@ POC_TRAP_TEXTS:
 	.ADDRESS	POC_TX_17_1, POC_TX_17_2, POC_TX_17_3, POC_TX_17_4
 	.ADDRESS	POC_TX_17_5
 	.ADDRESS	POC_TX_20_1, POC_TX_20_2, POC_TX_20_3, POC_TX_20_4
-	.ADDRESS	POC_TX_20_5
+	.ADDRESS	POC_TX_20_5, POC_TX_20_6, POC_TX_20_7
 	.PSECT	POC_CONST
 POC_TX_0:	.ASCIC	/trap/
 POC_TX_2:	.ASCIC	/index out of range/
@@ -100,6 +101,8 @@ POC_TX_20_2:	.ASCIC	/Send on a closed channel/
 POC_TX_20_3:	.ASCIC	/Close of a channel already closed/
 POC_TX_20_4:	.ASCIC	/Start of a task already started/
 POC_TX_20_5:	.ASCIC	/NewChannel with a negative capacity/
+POC_TX_20_6:	.ASCIC	/AwaitReadable or AwaitWritable of a negative descriptor/
+POC_TX_20_7:	.ASCIC	"AwaitReadable or AwaitWritable on VAX/VMS"
 POC_TX_CHR:	.ASCIC	/CHR argument out of range/
 POC_TX_VAL:	.ASCIC	/VAL argument out of range/
 ; -trap-location's form: file:line:column: message (in procedure)
@@ -144,7 +147,7 @@ POC_ASSERT_OUT:
 ; and procedure counted strings, the code in the low word of its
 ; longword and which of its messages in the high word (1 for 14, CHR's,
 ; 2 VAL's; n + 1 for 10, ASSERT(x, n)'s "assertion failed (n)"; n for 17,
-; Coroutines' case n, 1 to 5; n for 20, Tasks' case n, 1 to 5): the message
+; Coroutines' case n, 1 to 5; n for 20, Tasks' case n, 1 to 7): the message
 ; written to SYS$ERROR, as the LLVM backend writes it to the standard
 ; error, then the program ends with %X10000000 + 8 * code + 2, severity
 ; error, message number code, with STS$M_INHIB_MSG set so that DCL adds
@@ -161,14 +164,16 @@ POC_ASSERT_OUT:
 	BEQL	3$
 	MOVZWL	6(AP), R0
 	BEQL	10$
-	CMPL	R0, #5
-	BGTRU	10$
 	CMPL	R3, #17
 	BNEQ	2$
+	CMPL	R0, #5
+	BGTRU	10$
 	ADDL3	#22, R0, R3
 	BRB	10$
 2$:	CMPL	R3, #20
 	BNEQ	10$
+	CMPL	R0, #7
+	BGTRU	10$
 	ADDL3	#27, R0, R3
 	BRB	10$
 3$:	MOVZWL	6(AP), R0

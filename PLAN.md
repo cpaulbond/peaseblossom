@@ -1272,6 +1272,8 @@ Those fixed while Phase 18 was current, 8-10, are in
     many collections run, follows from how fast SIMH runs. A likely fix:
     the main loop goes on until it has both its batches and 3 collections,
     so the count is a condition of the run's end, not of its speed.
+    Seen again 2026-11-14 in Phase 10's gate, the objects way on atla,
+    with a rerun that passed.
 
 ## Ongoing library enhancements
 

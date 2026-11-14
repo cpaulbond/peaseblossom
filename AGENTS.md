@@ -493,16 +493,18 @@ first; nothing may unwind across a switch.
 ### Tasks (decided 2026-11-14; Phase 19, candidate 7)
 
 A runtime module over `Coroutines`, the same Oberon on both back ends,
-implemented but for time, events and `TaskInput` (`doc/developer/tasks.md`,
-Phase 9 done, 10-13 to come; probes in `concurrency-survey.md` section 10). A task is a `TaskDesc` extension with an
+implemented but for `TaskInput` (`doc/developer/tasks.md`,
+Phases 9 and 10 done, 11-13 to come; probes in `concurrency-survey.md` section 10). A task is a `TaskDesc` extension with an
 exported `Run`; nothing preempts; the program ends with the main body,
 abandoning tasks. Mesa conditions, mutexes, channels of extensible records,
 a receive-only `Select`, `After` as a timeout channel. `Post` only sets
 flags, for signal handlers and ASTs; the idle wait is `poll` and a
 self-pipe on POSIX, `$HIBER`/`$WAKE` and its own `$SETIMR` on VMS (never
 `$CANWAK`), replaceable by `SetIdleStep` (which must watch
-`WakeDescriptor()`). `Sleep` waits at least its time. Traps 19 (all
-blocked) and 20 (misuse); on VMS no AST-level check (its cost), so a
+`WakeDescriptor()`). `Sleep` waits at least its time. `AwaitReadable`
+and `AwaitWritable` are POSIX's (VMS: trap 20; a `$QIO`'s AST posts
+instead). Traps 19 (all blocked, no timer, descriptor or `Await`) and 20
+(misuse); on VMS no AST-level check (its cost), so a
 blocking call in an AST is undefined.
 
 ## Project state

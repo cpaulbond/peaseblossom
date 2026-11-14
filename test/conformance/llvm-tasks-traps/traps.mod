@@ -1,8 +1,9 @@
 MODULE traps;
   (* One trap of Tasks per run, chosen by the argument, with an object's
      finalizer registered, which every one of them runs: 19 (all tasks
-     blocked), each case of 20 (misuse), and 17 (a call that blocks in a
-     finalizer or a signal handler, with another task ready). *)
+     blocked), each case of 20 (misuse) but VAX/VMS's, and 17 (a call
+     that blocks in a finalizer or a signal handler, with another task
+     ready). *)
   IMPORT SYSTEM, Tasks, GarbageCollectedHeap, Modules, Platform, Out;
 
   TYPE
@@ -106,6 +107,8 @@ BEGIN
   | 14: NEW(idle); Tasks.Start(idle, Tasks.DefaultStackSize);
         Platform.SetInterruptHandler(Handler);
         IF Raise(2) = 0 THEN END
+  | 15: Tasks.AwaitReadable(-1)
+  | 16: Tasks.AwaitWritable(-3)
   END;
   Out.String("not reached"); Out.Ln
 END traps.

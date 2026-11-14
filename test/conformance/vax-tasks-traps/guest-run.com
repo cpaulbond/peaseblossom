@@ -1,7 +1,7 @@
 $ ! vax-tasks-traps (doc/developer/tasks.md, Phase 9): poc's runtime and
 $ ! Coroutines' switch, COROUTINESWITCH.MAR, are assembled; TASKTRAPS.COM,
 $ ! which poc -build wrote, links the program with the switch by its -link
-$ ! line; then the image runs once for each case, 1 to 13, as a foreign
+$ ! line; then the image runs once for each case, 1 to 14, as a foreign
 $ ! command given the case, its SYS$ERROR, where a trap's message goes, a
 $ ! file shown after the run. Everything made is deleted
 $ SET NOON
@@ -17,7 +17,7 @@ $ TRAPS = "$" + F$ENVIRONMENT("DEFAULT") + "TASKTRAPS.EXE"
 $ N = 0
 $NEXT_CASE:
 $ N = N + 1
-$ IF N .GT. 13 THEN GOTO CLEAN
+$ IF N .GT. 14 THEN GOTO CLEAN
 $ WRITE SYS$OUTPUT "== ", N
 $ DEFINE/USER_MODE SYS$ERROR TRAPS.ERR
 $ TRAPS 'N'
