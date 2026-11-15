@@ -1760,8 +1760,9 @@ stack sized for it. Also:
 - **Misuse traps** (status 20), with a message that says which: an
   `Unlock` of a mutex the task does not hold, a `Join` of the running
   task, a `Send` on a closed channel, a second `Close` or `Start`, a
-  negative capacity, and on VAX/VMS `AwaitReadable` and `AwaitWritable`,
-  which are POSIX's.
+  negative capacity, a negative descriptor, and on VAX/VMS
+  `AwaitReadable`, `AwaitWritable` and their `For` forms, which are
+  POSIX's.
 - **A signal handler may only `Post`** an `Event` (on VAX/VMS, an AST
   too), and never allocates.
 - **The program has one thread.** It must not start another, from C

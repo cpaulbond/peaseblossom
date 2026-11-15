@@ -6,7 +6,8 @@
 # of the running task; Send on a closed channel, and a sender waiting when
 # its channel is closed; Close of a closed channel; Start of a started
 # task; NewChannel with a negative capacity; AwaitReadable and
-# AwaitWritable of a negative descriptor, Phase 10); 17 (a Yield in a
+# AwaitWritable of a negative descriptor, Phase 10, and their For forms,
+# decision 15); 17 (a Yield in a
 # finalizer and in a signal handler, with another task ready); each with a
 # finalizer run. A task in Await is not blocked for good (a signal handler
 # may post), so main awaiting alone is not a 19.
@@ -17,7 +18,7 @@ limit_memory() {
   ulimit -v 1000000 2>/dev/null || ulimit -d 1000000
 }
 poc -o traps.exe -build traps.mod >result 2>&1
-for which in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16
+for which in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18
 do
   echo "== $which" >>result
   (limit_memory; ./traps.exe $which) >>result 2>&1

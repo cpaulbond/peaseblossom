@@ -3383,10 +3383,12 @@ An override of Run must be exported, as the base procedure is.
 
 SCHEDULING. Nothing preempts: a task runs until it makes a call that
 can block (Yield, Join, Wait, Lock, Send, Receive, Select, Sleep,
-Await, AwaitReadable, AwaitWritable), and only then may another
-run, so code between two such calls is atomic. A task that blocks switches straight to the first ready task, in the
-order they became ready; Yield puts the running task at the end. A
-blocking call, I/O included, of any other module stops every task.
+Await, AwaitReadable, AwaitWritable, AwaitReadableFor,
+AwaitWritableFor), and only then may another run, so code between
+two such calls is atomic. A task that blocks switches straight to
+the first ready task, in the order they became ready; Yield puts the
+running task at the end. A blocking call, I/O included, of any other
+module stops every task.
 The program ends when the main module's body ends: tasks still
 running are abandoned (their Runs do not finish), so Join is how to
 wait for one.
@@ -3406,7 +3408,9 @@ FALSE.
 TIME. Sleep and After wait at least their time, and longer when the
 clock ticks coarsely (10 ms on OpenBSD, NetBSD and VAX/VMS) or other
 tasks keep running: while tasks are ready the clock is read only
-every 256 picks of a task to run.
+every 256 picks of a task to run. AwaitReadableFor and
+AwaitWritableFor wait until a descriptor is ready or their time has
+passed, and say which: a deadline on a socket's read or write.
 
 EVENTS. An Event is how a signal handler, an AST, or a replaced idle
 step's callback wakes a task: Post sets a flag, which the scheduler
@@ -3428,10 +3432,10 @@ in Await, or awaiting a descriptor. Misuse traps (20): an Unlock of
 a mutex the running task does not hold, a Join of the running task,
 a Send on a closed channel (also one waiting when the channel is
 closed), a Close of a channel already closed, a Start of a task
-already started, NewChannel with a negative capacity, AwaitReadable
-or AwaitWritable of a negative descriptor, or on VAX/VMS at all. A
-call that blocks traps (17) in a finalizer, as Transfer does there;
-on LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
+already started, NewChannel with a negative capacity, AwaitReadable,
+AwaitWritable or their For forms of a negative descriptor, or on
+VAX/VMS at all. A call that blocks traps (17) in a finalizer, as
+Transfer does there; on LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
 level is undefined.
 
 RULES the program keeps, which nothing checks:
@@ -3524,6 +3528,16 @@ MODULE Tasks;
 
   (* Waits until fd can be written to without blocking, or is in error *)
   PROCEDURE AwaitWritable*(fd: LONGINT);
+
+  (* Waits until fd can be read without blocking, as AwaitReadable, or
+     until milliseconds have passed, whichever is first: TRUE when fd is
+     ready, FALSE when the time passed (at least milliseconds, then).
+     When milliseconds is not positive it looks without waiting, then
+     Yields. *)
+  PROCEDURE AwaitReadableFor*(fd: LONGINT; milliseconds: LONGINT): BOOLEAN;
+
+  (* AwaitWritable with a time limit, as AwaitReadableFor *)
+  PROCEDURE AwaitWritableFor*(fd: LONGINT; milliseconds: LONGINT): BOOLEAN;
 
   (* The read end of the pipe that a Post during the idle step writes to,
      for a replaced step to watch; -1 on VAX/VMS, or if it could not be

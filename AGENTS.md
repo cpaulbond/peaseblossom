@@ -503,7 +503,10 @@ self-pipe on POSIX, `$HIBER`/`$WAKE` and its own `$SETIMR` on VMS (never
 `$CANWAK`), replaceable by `SetIdleStep` (which must watch
 `WakeDescriptor()`). `Sleep` waits at least its time. `AwaitReadable`
 and `AwaitWritable` are POSIX's (VMS: trap 20; a `$QIO`'s AST posts
-instead). `TaskInput`'s `Char`/`Line` read standard input as a task
+instead); `AwaitReadableFor`/`AwaitWritableFor` add a time limit and
+return whether the descriptor became ready, the task in both the
+descriptor list and the timers until one ends the wait (decision 15,
+2026-11-15). `TaskInput`'s `Char`/`Line` read standard input as a task
 (never mixed with `In`); on a VMS terminal Out's and Err's lines break
 through its pending read (`IO$M_BREAKTHRU`), and a disk file's RMS read
 still stops every task. Traps 19 (all blocked, no timer, descriptor or `Await`) and 20

@@ -94,6 +94,8 @@ DEFINITION Tasks;
   (* POSIX only (decisions 10 and 11) *)
   PROCEDURE AwaitReadable (fd: LONGINT);
   PROCEDURE AwaitWritable (fd: LONGINT);
+  PROCEDURE AwaitReadableFor (fd, milliseconds: LONGINT): BOOLEAN;   (* decision 15 *)
+  PROCEDURE AwaitWritableFor (fd, milliseconds: LONGINT): BOOLEAN;
   PROCEDURE WakeDescriptor (): LONGINT;
 END Tasks.
 
@@ -283,6 +285,35 @@ END TaskInput.
     - On VMS, run a `Tasks` program under the debugger only with
       `DEFINE DBG$PROCESS NONE`: the default two-process debugger loses
       a remembered `$WAKE`, and the program can hang.
+
+15. **A descriptor wait can have a time limit** (the user, 2026-11-15,
+    for posockets, `~/Repos/Oberon/posockets/PLAN.md`, "Deadlines").
+    `AwaitReadableFor(fd, ms)` and `AwaitWritableFor(fd, ms)` return
+    `TRUE` when `fd` is ready, `FALSE` when `ms` has passed first. A
+    socket's read or write with a deadline, and a server that checks
+    now and then whether to stop, wait this way.
+    - Without it, a deadline needed another task to make the descriptor
+      ready (a `shutdown` after a `Sleep`), which ends the connection,
+      and a task blocked for good in `AwaitReadable` kept its stack.
+      `After` and `Select` don't help: `Select` takes channels, and a
+      descriptor is not one.
+    - The waiting task is in both the list of tasks awaiting descriptors
+      and, through its own timer (`Sleep`'s), the list of timers.
+      Whichever ends the wait takes it out of the other list, so neither
+      a timer nor a poll entry is left behind, and a later wait or
+      `Sleep` reuses the timer.
+    - When both are due at one look, the timer wins: timers expire
+      before descriptors are polled. A caller that times out retries or
+      gives up, so the order does not matter, and it costs no extra
+      poll.
+    - A time that is not positive polls `fd` once without waiting, then
+      `Yield`s, as `Sleep(0)` does, so a loop of them cannot starve the
+      other tasks.
+    - Trap 20 as `AwaitReadable`'s: a negative descriptor (case 6), or
+      on VMS any call (case 7). Their texts name `AwaitReadable or
+      AwaitWritable`, unchanged.
+    - Fixtures: `llvm-tasks-timed`, and cases 17 and 18 of
+      `llvm-tasks-traps`.
 
 ## What changes
 
@@ -585,8 +616,10 @@ Possibilities recorded with the user (2026-11-14), not part of this plan:
   VMS only; on POSIX it could not help (decision 11).
 - **Sockets**: a `Sockets` module, useful without `Tasks`, whose calls
   that can block have forms a task waits in. On POSIX, a non-blocking
-  socket and `AwaitReadable`/`AwaitWritable` are enough, with no change to
-  `Tasks`. On VMS the TCP/IP stack is not one thing: the SIMH guest runs
+  socket and `AwaitReadable`/`AwaitWritable` are enough, with
+  `AwaitReadableFor`/`AwaitWritableFor` for deadlines (decision 15).
+  posockets (`~/Repos/Oberon/posockets`) is that library, outside this
+  repository. On VMS the TCP/IP stack is not one thing: the SIMH guest runs
   UCX, but a VAX the user runs poc on has MultiNet, probably not a recent
   one, so a VMS `Sockets` would need both stacks' interfaces probed.
 - **A Gemini server, Unix only**, over `Sockets`, `Tasks` and a TLS

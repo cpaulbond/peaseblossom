@@ -709,7 +709,7 @@ has, described at the end of this chapter.
 | `VT100` | `Out.Flush` | Each sequence reaches the terminal as it is sent. |
 | `GarbageCollectedHeap` | `LIB$GET_VM`, `$DCLEXH` | The heap is limited by the paging file quota. |
 | `Coroutines` | `LIB$GET_VM_PAGE`, `$SETPRT`, `COROUTINESWITCH.MAR` | Smaller stacks, counted against the paging file quota whole. |
-| `Tasks` | `Coroutines`, `$HIBER`, `$WAKE`, `$SETIMR`, `$GETTIM` | An AST posts, not a signal handler. No `AwaitReadable` or `AwaitWritable`. |
+| `Tasks` | `Coroutines`, `$HIBER`, `$WAKE`, `$SETIMR`, `$GETTIM` | An AST posts, not a signal handler. No `AwaitReadable` or `AwaitWritable`, timed or not. |
 | `TaskInput` | `$ASSIGN`, `$QIO`, `Platform.Read` | A terminal or mailbox is read a record at a time; a file stops every task. |
 
 ### Files
@@ -955,8 +955,8 @@ and on VMS it is assembled once, as `POCRTL.OBJ` is:
 ### Tasks
 
 `Tasks` has the same interface as on Unix (the *User's Guide*, chapter
-12), and the same programs run unchanged, but for `AwaitReadable` and
-`AwaitWritable`. What differs is how the program waits when no task can
+12), and the same programs run unchanged, but for `AwaitReadable`,
+`AwaitWritable` and their `For` forms. What differs is how the program waits when no task can
 run, what may post an event, and how standard input is read.
 
 **The idle wait.** When every task waits, `Tasks` hibernates the process
@@ -976,8 +976,8 @@ is 32 KiB and the least is 8 KiB, counted against the paging file quota
 as `Coroutines`' are. A task that recurses deeply needs a larger
 `Start(t, size)`.
 
-**Waiting for I/O.** There is no `AwaitReadable` or `AwaitWritable`;
-each ends the program by trap 20. A task waits for a device by queueing
+**Waiting for I/O.** There is no `AwaitReadable` or `AwaitWritable`,
+timed or not; each ends the program by trap 20. A task waits for a device by queueing
 a `$QIO` whose completion AST posts an event, and awaiting the event
 (chapter 14 shows one). `Post` is the one procedure of `Tasks` an AST
 may call. Any other, any that might block, is undefined at AST level,

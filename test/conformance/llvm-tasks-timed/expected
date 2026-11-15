@@ -1,0 +1,53 @@
+A: an empty pipe
+  timed out at least 50 ms
+  slept at least 20 ms
+  bytes 1
+B: the pipe first, beside a sleeper
+  written
+  ready sooner than 5000 ms
+  slept at least 100 ms
+  bytes 1
+C: waits of several lengths on one pipe
+  20 ms: timed out at least 20 ms
+  40 ms: timed out at least 40 ms
+  60 ms: timed out at least 60 ms
+  written
+  5000 ms: ready
+  all sooner than 5000 ms
+  bytes 1
+D: a full pipe
+  timed out at least 30 ms
+  drained
+  ready
+E: no time
+  readable, empty: timed out; the other task ran 1
+  readable, a byte: ready
+  writable: ready
+exit=0
+== -OC
+A: an empty pipe
+  timed out at least 50 ms
+  slept at least 20 ms
+  bytes 1
+B: the pipe first, beside a sleeper
+  written
+  ready sooner than 5000 ms
+  slept at least 100 ms
+  bytes 1
+C: waits of several lengths on one pipe
+  20 ms: timed out at least 20 ms
+  40 ms: timed out at least 40 ms
+  60 ms: timed out at least 60 ms
+  written
+  5000 ms: ready
+  all sooner than 5000 ms
+  bytes 1
+D: a full pipe
+  timed out at least 30 ms
+  drained
+  ready
+E: no time
+  readable, empty: timed out; the other task ran 1
+  readable, a byte: ready
+  writable: ready
+exit=0

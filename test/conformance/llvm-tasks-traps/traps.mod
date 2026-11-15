@@ -109,6 +109,8 @@ BEGIN
         IF Raise(2) = 0 THEN END
   | 15: Tasks.AwaitReadable(-1)
   | 16: Tasks.AwaitWritable(-3)
+  | 17: IF Tasks.AwaitReadableFor(-1, 10) THEN END
+  | 18: IF Tasks.AwaitWritableFor(-2, 0) THEN END
   END;
   Out.String("not reached"); Out.Ln
 END traps.

@@ -181,8 +181,8 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   idle wait (`$HIBER`, with a `$SETIMR` of its own for a timeout), the
   wake an AST gives (`$WAKE`), and the traps 19 (all tasks blocked) and
   20 (misuse, by case), through `POC_TRAP`, whose texts are in
-  `PocRtl.mar`. VMS has no descriptors to wait for: `AwaitReadable` and
-  `AwaitWritable` trap (20), and an I/O wait is a `$QIO` whose AST posts
+  `PocRtl.mar`. VMS has no descriptors to wait for: `AwaitReadable`,
+  `AwaitWritable` and their `For` forms trap (20), and an I/O wait is a `$QIO` whose AST posts
   an event.
 - `TaskInput.Mod` - standard input read by a task (`doc/developer/tasks.md`,
   Phase 11), the interface of `rtl/llvm/TaskInput.Mod`. A terminal or a

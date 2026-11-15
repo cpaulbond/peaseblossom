@@ -840,7 +840,7 @@ trap's condition value is `%X10000002` plus 8 times the status (16-20 are
 | 17 | Misuse of `Coroutines` ("Coroutines"; the same fixtures): `Transfer` to a record never given to `Init`, or to a freed coroutine; `Free` of the running coroutine or of `main`'s; `Transfer` in a finalizer, in a signal handler (LLVM) or at AST level (VAX, in a program that imports `AsynchronousTraps`). A `Tasks` call that blocks or yields in a finalizer or a signal handler is the same `Transfer` (`llvm-tasks-traps`, `vax-tasks-traps`); at AST level it is undefined, unchecked ("Tasks") | one text for each case: `Transfer to a coroutine never initialized`, `Transfer to a freed coroutine`, `Free of the running coroutine`, `Free of the main program's coroutine`, `Transfer in a finalizer`, `Transfer in a signal handler`, `Transfer at AST level` | none |
 | 18 | `Coroutines.Init` cannot get memory for the stack, always: unlike `NEW` there is no NIL to test (the same fixtures) | `no memory for a coroutine's stack` | none |
 | 19 | A `Tasks` program in which every task is blocked, with no task ready, no timer pending, no task waiting for a descriptor and no task in `Await`, which a signal handler or an AST may end ("Tasks"; `llvm-tasks-traps`, `vax-tasks-traps`; `tasks.md` Phases 9 and 10) | `all tasks are blocked` | none: voc has no `Tasks` |
-| 20 | Misuse of `Tasks` ("Tasks"; the same fixtures; `tasks.md` Phase 9): `Unlock` of a mutex the running task does not hold, `Join` of the running task, `Send` on a closed channel, `Close` of a channel already closed, `Start` of a task already started, `NewChannel` with a negative capacity, `AwaitReadable` or `AwaitWritable` of a negative descriptor (POSIX) or at all (VAX/VMS, which has no descriptors to wait for; Phase 10) | one text for each case, the case's own words: `Unlock of a mutex the running task does not hold`, `Join of the running task`, `Send on a closed channel`, `Close of a channel already closed`, `Start of a task already started`, `NewChannel with a negative capacity`, `AwaitReadable or AwaitWritable of a negative descriptor`, `AwaitReadable or AwaitWritable on VAX/VMS` | none |
+| 20 | Misuse of `Tasks` ("Tasks"; the same fixtures; `tasks.md` Phase 9): `Unlock` of a mutex the running task does not hold, `Join` of the running task, `Send` on a closed channel, `Close` of a channel already closed, `Start` of a task already started, `NewChannel` with a negative capacity, `AwaitReadable`, `AwaitWritable` or their `For` forms of a negative descriptor (POSIX) or at all (VAX/VMS, which has no descriptors to wait for; Phase 10, `tasks.md` decision 15) | one text for each case, the case's own words: `Unlock of a mutex the running task does not hold`, `Join of the running task`, `Send on a closed channel`, `Close of a channel already closed`, `Start of a task already started`, `NewChannel with a negative capacity`, `AwaitReadable or AwaitWritable of a negative descriptor`, `AwaitReadable or AwaitWritable on VAX/VMS` | none |
 
 **The library's own failure.** `Files` stops the program with status 99 when
 it meets an error it cannot hand back to the caller - a file that cannot be
@@ -2074,7 +2074,8 @@ What a program will be able to observe:
   is a task too.
 - **Nothing preempts.** A task runs until it makes a call that can block
   (`Yield`, `Join`, `Sleep`, `Wait`, `Lock`, `Send`, `Receive`, `Select`,
-  `Await`, `AwaitReadable`, `AwaitWritable`), and code between two such
+  `Await`, `AwaitReadable`, `AwaitWritable`, `AwaitReadableFor`,
+  `AwaitWritableFor`), and code between two such
   calls is atomic. The run queue is FIFO, `Signal` wakes the longest
   waiter, and conditions are Mesa's: a woken task tests again.
 - **The program ends when the main module's body ends**, as in Go: tasks
@@ -2094,6 +2095,8 @@ What a program will be able to observe:
   looked at every 256th switch while any is pending.
 - **`AwaitReadable` and `AwaitWritable` are POSIX's**: on VMS they trap
   (20), and a task waits for I/O by a `$QIO` whose AST posts an event.
+  `AwaitReadableFor(fd, ms)` and `AwaitWritableFor(fd, ms)` wait at most
+  `ms` and return whether `fd` became ready (`tasks.md`, decision 15).
 - **`SetIdleStep(p)` replaces the wait**, for a toolkit's own loop such
   as pofltk's `Fl.Wait`. The step must return when `WakeDescriptor()` is
   readable (POSIX), must watch the descriptors tasks wait for, and runs on

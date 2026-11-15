@@ -1387,6 +1387,13 @@ Those done while Phase 15 was current, 1 and 2, are in
     Guide's chapter 12 and its examples, and the VAX/VMS Guide's
     "Tasks".
 
+6.  Timed descriptor waits in `Tasks` (the user, 2026-11-15, for
+    posockets' deadlines and a server's stop, `~/Repos/Oberon/posockets/
+    PLAN.md`): `AwaitReadableFor(fd, ms)` and `AwaitWritableFor(fd, ms)`
+    return whether `fd` became ready before `ms` passed.
+    `doc/developer/tasks.md`, decision 15; fixtures `llvm-tasks-timed`
+    and `llvm-tasks-traps`' cases 17 and 18.
+
 ## Ongoing language enhancements
 
 Language extensions that using poc on other programs shows are wanted,

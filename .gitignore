@@ -19,6 +19,7 @@ test/conformance/**/*.c
 !test/conformance/llvm-object-reuse/src/A.c
 !test/conformance/llvm-system-val-external/part/Compare.c
 !test/conformance/llvm-tasks-events/part/ChildProcesses.c
+!test/conformance/llvm-tasks-timed/part/Pipes.c
 !test/conformance/llvm-external-variable/part/Counters.c
 !test/conformance/llvm-coroutines-c-callback/part/Callback.c
 test/conformance/**/*.h

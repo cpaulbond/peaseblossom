@@ -132,7 +132,8 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   an exported `Run`; a FIFO run queue, `Yield`, `Join`, Mesa conditions,
   mutexes, channels of extensible records and a receive-only `Select`;
   `Sleep`, `After`, events a signal handler may `Post`, `AwaitReadable`
-  and `AwaitWritable`, and an idle step `SetIdleStep` replaces.
+  and `AwaitWritable`, with time limits in `AwaitReadableFor` and
+  `AwaitWritableFor`, and an idle step `SetIdleStep` replaces.
   Nothing preempts. The same file as `rtl/vax/Tasks.Mod` (fixture
   `tasks-same-source`); what differs by system is in `TaskWaiting`.
 - `TaskWaiting.Mod`, `TaskWaiting.c` - `Tasks`' system part: the

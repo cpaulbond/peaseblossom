@@ -22,10 +22,12 @@ MODULE Tasks;
 
      SCHEDULING. Nothing preempts: a task runs until it makes a call that
      can block (Yield, Join, Wait, Lock, Send, Receive, Select, Sleep,
-     Await, AwaitReadable, AwaitWritable), and only then may another
-     run, so code between two such calls is atomic. A task that blocks switches straight to the first ready task, in the
-     order they became ready; Yield puts the running task at the end. A
-     blocking call, I/O included, of any other module stops every task.
+     Await, AwaitReadable, AwaitWritable, AwaitReadableFor,
+     AwaitWritableFor), and only then may another run, so code between
+     two such calls is atomic. A task that blocks switches straight to
+     the first ready task, in the order they became ready; Yield puts the
+     running task at the end. A blocking call, I/O included, of any other
+     module stops every task.
      The program ends when the main module's body ends: tasks still
      running are abandoned (their Runs do not finish), so Join is how to
      wait for one.
@@ -45,7 +47,9 @@ MODULE Tasks;
      TIME. Sleep and After wait at least their time, and longer when the
      clock ticks coarsely (10 ms on OpenBSD, NetBSD and VAX/VMS) or other
      tasks keep running: while tasks are ready the clock is read only
-     every 256 picks of a task to run.
+     every 256 picks of a task to run. AwaitReadableFor and
+     AwaitWritableFor wait until a descriptor is ready or their time has
+     passed, and say which: a deadline on a socket's read or write.
 
      EVENTS. An Event is how a signal handler, an AST, or a replaced idle
      step's callback wakes a task: Post sets a flag, which the scheduler
@@ -67,10 +71,10 @@ MODULE Tasks;
      a mutex the running task does not hold, a Join of the running task,
      a Send on a closed channel (also one waiting when the channel is
      closed), a Close of a channel already closed, a Start of a task
-     already started, NewChannel with a negative capacity, AwaitReadable
-     or AwaitWritable of a negative descriptor, or on VAX/VMS at all. A
-     call that blocks traps (17) in a finalizer, as Transfer does there;
-     on LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
+     already started, NewChannel with a negative capacity, AwaitReadable,
+     AwaitWritable or their For forms of a negative descriptor, or on
+     VAX/VMS at all. A call that blocks traps (17) in a finalizer, as
+     Transfer does there; on LLVM in a signal handler too. On VAX/VMS a call that blocks at AST
      level is undefined.
 
      RULES the program keeps, which nothing checks:
@@ -118,7 +122,8 @@ MODULE Tasks;
     END;
     WaiterQueue = RECORD first, last: Waiter END;
 
-    (* a Sleep's (task) or an After's (channel), in the list of timers *)
+    (* a Sleep's or a timed descriptor wait's (task) or an After's
+       (channel), in the list of timers *)
     Timer = POINTER TO TimerDesc;
     TimerDesc = RECORD
       deadline: HUGEINT;   (* TaskWaiting.Now's microseconds *)
@@ -135,10 +140,13 @@ MODULE Tasks;
       waiter: Waiter;      (* its own, for a Send or a Receive *)
       spares: Waiter;      (* for Select *)
       fired: Waiter;       (* the waiter that woke it; NIL while it waits *)
-      timer: Timer;        (* its own, for Sleep *)
+      timer: Timer;        (* its own, for Sleep and a timed descriptor wait *)
       event: SYSTEM.ADDRESS;  (* the flag of the Event it awaits *)
       descriptor: LONGINT; (* the one it awaits *)
-      forWriting: BOOLEAN
+      forWriting: BOOLEAN;
+      (* in watching with its timer pending, in AwaitReadableFor or
+         AwaitWritableFor; whether that wait's timer ended it *)
+      timed, timedOut: BOOLEAN
     END;
 
     Condition* = RECORD waiting: TaskQueue END;
@@ -167,7 +175,7 @@ MODULE Tasks;
     endedTask: Task;
     timers: Timer;          (* the nearest deadline first *)
     awaiting: TaskQueue;    (* tasks in Await *)
-    watching: TaskQueue;    (* tasks in AwaitReadable or AwaitWritable *)
+    watching: TaskQueue;    (* tasks awaiting a descriptor, timed or not *)
     watchCount: LONGINT;
     picks: LONGINT;         (* since the clock was last read *)
     lastPoll: HUGEINT;
@@ -238,13 +246,46 @@ MODULE Tasks;
 
   PROCEDURE ^ Put(ch: Channel; m: Message): BOOLEAN;
 
-  (* Ends the timers whose deadlines are not after now *)
+  (* Takes t, which is there, out of watching *)
+  PROCEDURE Unwatch(t: Task);
+    VAR p: Task;
+  BEGIN
+    IF watching.first = t THEN watching.first := t.next; p := NIL
+    ELSE
+      p := watching.first;
+      WHILE p.next # t DO p := p.next END;
+      p.next := t.next
+    END;
+    IF watching.last = t THEN watching.last := p END;
+    t.next := NIL;
+    DEC(watchCount)
+  END Unwatch;
+
+  (* Takes t, which is there, out of the list of timers *)
+  PROCEDURE RemoveTimer(t: Timer);
+    VAR p: Timer;
+  BEGIN
+    IF timers = t THEN timers := t.next
+    ELSE
+      p := timers;
+      WHILE p.next # t DO p := p.next END;
+      p.next := t.next
+    END;
+    t.next := NIL
+  END RemoveTimer;
+
+  (* Ends the timers whose deadlines are not after now: a timed
+     descriptor wait's ends with the task timed out *)
   PROCEDURE ExpireTimers(now: HUGEINT);
     VAR t: Timer; sent: BOOLEAN;
   BEGIN
     WHILE (timers # NIL) & (timers.deadline <= now) DO
       t := timers; timers := t.next; t.next := NIL;
-      IF t.task # NIL THEN MakeReady(t.task)
+      IF t.task # NIL THEN
+        IF t.task.timed THEN
+          Unwatch(t.task); t.task.timed := FALSE; t.task.timedOut := TRUE
+        END;
+        MakeReady(t.task)
       ELSIF ~t.channel.closed THEN sent := Put(t.channel, NIL)
       END
     END
@@ -299,6 +340,7 @@ MODULE Tasks;
         IF previous = NIL THEN watching.first := next ELSE previous.next := next END;
         IF watching.last = t THEN watching.last := previous END;
         DEC(watchCount);
+        IF t.timed THEN t.timed := FALSE; RemoveTimer(t.timer) END;
         MakeReady(t)
       ELSE previous := t
       END;
@@ -466,16 +508,24 @@ MODULE Tasks;
   END Unlock;
 
   (* Waits at least milliseconds; Yield when it is not positive *)
-  PROCEDURE Sleep*(milliseconds: LONGINT);
+  (* Puts the running task's own timer in the list, due in milliseconds,
+     which is positive *)
+  PROCEDURE ArmTimer(milliseconds: LONGINT);
     VAR t: Timer; delay: HUGEINT;
+  BEGIN
+    IF current.timer = NIL THEN NEW(current.timer); current.timer.task := current END;
+    t := current.timer;
+    delay := milliseconds;
+    t.deadline := TaskWaiting.Now() + delay * 1000;
+    AddTimer(t)
+  END ArmTimer;
+
+  (* Waits at least milliseconds; Yield when it is not positive *)
+  PROCEDURE Sleep*(milliseconds: LONGINT);
   BEGIN
     IF milliseconds <= 0 THEN Yield
     ELSE
-      IF current.timer = NIL THEN NEW(current.timer); current.timer.task := current END;
-      t := current.timer;
-      delay := milliseconds;
-      t.deadline := TaskWaiting.Now() + delay * 1000;
-      AddTimer(t);
+      ArmTimer(milliseconds);
       current.state := blocked;
       Block
     END
@@ -543,6 +593,50 @@ MODULE Tasks;
   BEGIN
     AwaitDescriptor(fd, TRUE)
   END AwaitWritable;
+
+  (* AwaitDescriptor for at most milliseconds: whether fd became ready.
+     The task waits for fd and for its own timer, and whichever comes
+     first takes it out of the other's list. When the clock is read the
+     timers expire before the descriptors are polled, so a wait whose
+     time has passed times out even if fd is ready by then. *)
+  PROCEDURE AwaitDescriptorFor(fd: LONGINT; forWriting: BOOLEAN;
+    milliseconds: LONGINT): BOOLEAN;
+    VAR ready: BOOLEAN;
+  BEGIN
+    TaskWaiting.CheckDescriptor(fd);
+    IF milliseconds <= 0 THEN
+      (* a look without waiting; Idle rebuilds the list it uses each time *)
+      TaskWaiting.Clear;
+      TaskWaiting.Add(fd, forWriting);
+      TaskWaiting.Wait(0);
+      ready := TaskWaiting.Ready(0);
+      Yield
+    ELSE
+      current.descriptor := fd; current.forWriting := forWriting;
+      current.timed := TRUE; current.timedOut := FALSE;
+      ArmTimer(milliseconds);
+      WaitIn(watching); INC(watchCount);
+      Block;
+      ready := ~current.timedOut
+    END;
+    RETURN ready
+  END AwaitDescriptorFor;
+
+  (* Waits until fd can be read without blocking, as AwaitReadable, or
+     until milliseconds have passed, whichever is first: TRUE when fd is
+     ready, FALSE when the time passed (at least milliseconds, then).
+     When milliseconds is not positive it looks without waiting, then
+     Yields. *)
+  PROCEDURE AwaitReadableFor*(fd, milliseconds: LONGINT): BOOLEAN;
+  BEGIN
+    RETURN AwaitDescriptorFor(fd, FALSE, milliseconds)
+  END AwaitReadableFor;
+
+  (* AwaitWritable with a time limit, as AwaitReadableFor *)
+  PROCEDURE AwaitWritableFor*(fd, milliseconds: LONGINT): BOOLEAN;
+  BEGIN
+    RETURN AwaitDescriptorFor(fd, TRUE, milliseconds)
+  END AwaitWritableFor;
 
   (* The read end of the pipe that a Post during the idle step writes to,
      for a replaced step to watch; -1 on VAX/VMS, or if it could not be
