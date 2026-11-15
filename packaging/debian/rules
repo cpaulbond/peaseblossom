@@ -27,6 +27,7 @@
 # tarball has none of
 override_dh_auto_clean:
 	$(MAKE) clean-build
+	rm -rf debian/check-install debian/check-install-vax
 
 # The tarball has the VAX kits and the VAX/VMS Guide as text already:
 # installable-vax builds only the libraries. Not in parallel: the stages
@@ -64,6 +65,11 @@ override_dh_strip:
 	dh_strip --no-automatic-dbgsym -X/usr/lib/poc/
 
 override_dh_dwz:
+
+# The guides are read as they are, as on the other systems (check.sh and
+# check-vax.sh look for them by name): only the changelogs are compressed
+override_dh_compress:
+	dh_compress -X.md -X.txt -X.pdf
 
 override_dh_makeshlibs:
 	dh_makeshlibs -X/usr/lib/poc/
