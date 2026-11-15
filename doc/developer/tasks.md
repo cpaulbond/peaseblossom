@@ -559,12 +559,22 @@ them, checked by `tools/guide-examples`, and run on the guest by
 A pofltk example, from Phase 7.4, goes into pofltk's own repository,
 not poc's.
 
+Done 2026-11-14. On the guest a mailbox stands in for the terminal:
+`ClockFeeder`, a subprocess, feeds `Clock` its commands, and the
+mailbox's messages must hold TaskInput's 512-byte read (`PLAN.md`,
+"Ongoing bug fixing", 20).
+
 ### Phase 13: Documents and packaging
 
 `rtl/llvm/README.md`, `rtl/vax/README.md`, `tools/rtl-reference update`,
 the VAX/VMS Guide's "Tasks", the PLISTs, `PLAN.md`'s entry marked
 `[done]`, and the survey and Phase 19's candidate 7 recording C as
 adopted.
+
+Done 2026-11-14. The Reference Guide was already current. The VAX/VMS
+Guide's "Tasks" is in chapter 6, and chapter 14's "A completion AST and
+a task" has an example, `TaskMailbox`, a task that waits for a mailbox
+`$QIO` whose AST posts, run by `doc-vax-guide`.
 
 ## Later
 

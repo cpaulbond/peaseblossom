@@ -493,7 +493,7 @@ first; nothing may unwind across a switch.
 ### Tasks (decided 2026-11-14; Phase 19, candidate 7)
 
 A runtime module over `Coroutines`, the same Oberon on both back ends,
-implemented (`doc/developer/tasks.md`, Phases 9-11 done, 12-13 to come;
+implemented (`doc/developer/tasks.md`; the User's Guide's chapter 12;
 probes in `concurrency-survey.md` section 10). A task is a `TaskDesc` extension with an
 exported `Run`; nothing preempts; the program ends with the main body,
 abandoning tasks. Mesa conditions, mutexes, channels of extensible records,

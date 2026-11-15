@@ -139,6 +139,12 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   monotonic clock, the idle wait (`poll` on the descriptors tasks wait
   for and a self-pipe, which `Wake` writes to), and the traps' texts, 19
   (all tasks blocked) and 20 (misuse, by case).
+- `TaskInput.Mod` - standard input read by a task (`doc/developer/tasks.md`,
+  Phase 11): `Char`, `Line` and `Done`, meaning what `In`'s do, with
+  `In`'s read-ahead rule. When its buffer of 4 KiB is empty the task
+  waits by `Tasks.AwaitReadable(0)` while the others run, then reads by
+  one `Platform.Read`; `O_NONBLOCK` is never set. A program reads
+  standard input through `In` or through `TaskInput`, not both.
 
 Written in ordinary Oberon-2 over `SYSTEM.ADDRESS` (no pointer variables),
 except the C parts (`Platform.c`, `Coroutines.c`, `TaskWaiting.c`), so

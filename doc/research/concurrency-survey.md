@@ -411,7 +411,11 @@ Findings:
    `language-extensions.md`, "Coroutines").
 3. **Option C is the natural next step after B** and can wait until
    programs ask for it. It too is a library, not a language change.
-   Section 9 sketches one possible interface for it.
+   Section 9 sketches one possible interface for it. **Adopted
+   2026-11-14** and implemented on both back ends the same day, after
+   the probes of section 10 (`doc/developer/tasks.md`, whose fourteen
+   decisions settle section 9's open points; `language-extensions.md`,
+   "Tasks").
 4. **Options D and E: not adopted.**
    - D would be worth reconsidering only after C has been used. That
      use would show whether the checked structure is worth a language

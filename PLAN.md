@@ -687,8 +687,11 @@ A24, moved here 2026-09-26), are Phase 14 now.
    module (option B), was **adopted 2026-11-13** and implemented on both
    back ends the same day (`doc/developer/coroutines.md`; "Ongoing
    library enhancements", 4; `language-extensions.md`, "Coroutines").
-   **Undecided**: a heap re-entry trap on LLVM like the VAX's trap 15,
-   and a cooperative tasks library (item 3).
+   Item 3, a cooperative tasks library over it (option C), was
+   **adopted 2026-11-14** and implemented on both back ends the same
+   day (`doc/developer/tasks.md`; "Ongoing library enhancements", 5;
+   `language-extensions.md`, "Tasks"). **Undecided**: a heap re-entry
+   trap on LLVM like the VAX's trap 15.
 
 **Exit gate**: every candidate has a recorded decision; each adopted one has
 fixtures, is rejected by `-strict`, and passes `make check` on Linux and the
@@ -1325,7 +1328,7 @@ Those done while Phase 15 was current, 1 and 2, are in
     with the User's Guide's chapter 11 and the VAX/VMS Guide's
     "Coroutines".
 
-5.  A `Tasks` module on both back ends (the user, 2026-11-14; Phase
+5.  A `Tasks` module on both back ends [done] (the user, 2026-11-14; Phase
     19's candidate 7, option C of `doc/research/concurrency-survey.md`,
     whose section 10 records its probes): cooperative tasks over
     `Coroutines`, the same Oberon source in `rtl/llvm` and `rtl/vax`,
@@ -1335,7 +1338,10 @@ Those done while Phase 15 was current, 1 and 2, are in
     `TaskInput` module, and trap statuses 19 and 20. No compiler
     change. The plan, fourteen decisions (decided 2026-11-14, Phase 8)
     and seven phases (7-13), is in `doc/developer/tasks.md`; the work
-    is on the `tasks` branch.
+    is on the `tasks` branch. Implemented 2026-11-14 in `rtl/llvm` and
+    `rtl/vax` (fixtures `llvm-tasks-*`, `vax-tasks-*`), with the User's
+    Guide's chapter 12 and its examples, and the VAX/VMS Guide's
+    "Tasks".
 
 ## Ongoing language enhancements
 

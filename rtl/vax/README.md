@@ -184,3 +184,11 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   `PocRtl.mar`. VMS has no descriptors to wait for: `AwaitReadable` and
   `AwaitWritable` trap (20), and an I/O wait is a `$QIO` whose AST posts
   an event.
+- `TaskInput.Mod` - standard input read by a task (`doc/developer/tasks.md`,
+  Phase 11), the interface of `rtl/llvm/TaskInput.Mod`. A terminal or a
+  mailbox is `$ASSIGN`ed and read a record at a time by a `$QIO` whose AST
+  posts the reading task's event; a terminal read goes through
+  `PocRtl.mar`'s `POC_TASK_READ`, which makes `Out`'s unfinished line its
+  prompt and lets lines written meanwhile break through it. Anything else
+  (a disk file, a batch job's input, `NL:`) is read by `Platform.Read`, as
+  `In` reads, and every task waits while RMS reads.

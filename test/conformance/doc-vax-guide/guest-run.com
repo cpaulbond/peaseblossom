@@ -1,5 +1,6 @@
 $ ! doc-vax-guide: the VAX/VMS Guide's example programs built by the
-$ ! procedures poc -build wrote, against POCRTL.OBJ, and each run as the
+$ ! procedures poc -build wrote, against POCRTL.OBJ (TASKMAILBOX with
+$ ! COROUTINESWITCH.OBJ too), and each run as the
 $ ! guide's session of its name runs it, under "== <name>". A build's
 $ ! log is shown only if it fails. First Fault is linked from poc's own
 $ ! objects by FAULTO.COM, as FAULTO.EXE, and with FAULTG.OBJ, its object
@@ -8,6 +9,7 @@ $ ! debugger with FAULT.DBG's commands; then those objects are deleted,
 $ ! and the MACRO-32 is assembled. Everything made is deleted.
 $ SET NOON
 $ MACRO/OBJECT POCRTL.MAR
+$ MACRO/OBJECT COROUTINESWITCH.MAR
 $ @FAULTO/OUTPUT=BUILD.LOG
 $ IF .NOT. $STATUS THEN WRITE SYS$OUTPUT "build FAULTO failed: ", $STATUS
 $ IF .NOT. $STATUS THEN TYPE BUILD.LOG
@@ -18,8 +20,8 @@ $ IF .NOT. $STATUS THEN WRITE SYS$OUTPUT "build FAULTG failed: ", $STATUS
 $ IF .NOT. $STATUS THEN TYPE BUILD.LOG
 $ RENAME FAULT.EXE FAULTG.EXE
 $ DELETE/NOLOG BUILD.LOG;*
-$ DELETE/NOLOG/EXCLUDE=POCRTL.OBJ *.OBJ;*
-$ PROGRAMS = "HELLO,VERSIONS,WHERELOGIN,WHERELOGIN2,DATES,FACTORIAL,WORDS,SYSTEMINFO,GREET,SHELL,WARNINGS,PROBE,GOODBYE,TICKS,MAILBOX,SPAWN,FAIL,FAULT,PARTS,PANEL"
+$ DELETE/NOLOG/EXCLUDE=(POCRTL.OBJ,COROUTINESWITCH.OBJ) *.OBJ;*
+$ PROGRAMS = "HELLO,VERSIONS,WHERELOGIN,WHERELOGIN2,DATES,FACTORIAL,WORDS,SYSTEMINFO,GREET,SHELL,WARNINGS,PROBE,GOODBYE,TICKS,MAILBOX,TASKMAILBOX,SPAWN,FAIL,FAULT,PARTS,PANEL"
 $ I = 0
 $NEXT_BUILD:
 $ P = F$ELEMENT(I, ",", PROGRAMS)
@@ -78,6 +80,8 @@ $ WRITE SYS$OUTPUT "== ticks"
 $ RUN TICKS
 $ WRITE SYS$OUTPUT "== mailbox"
 $ RUN MAILBOX
+$ WRITE SYS$OUTPUT "== taskmailbox"
+$ RUN TASKMAILBOX
 $ WRITE SYS$OUTPUT "== spawn"
 $ RUN SPAWN
 $ WRITE SYS$OUTPUT "== fail"
