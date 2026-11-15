@@ -109,6 +109,8 @@ writes `build/gen/BuildInfo.Mod` with the commit on every build, so `poc
 | `make check-lto` | the fixtures with `-lto` (not a gate) |
 | `make check-install` | installs into a scratch directory and runs `test/install/check.sh` with only that poc and clang |
 | `make check-install-vax` | installs poc and `make install-vax`'s libraries, kits and guide into a scratch directory and runs `test/install/check-vax.sh`, which builds programs for the VAX with that poc alone (no guest); from a git checkout without pandoc, it leaves the guide out (`VAX_GUIDE=no`) and says so |
+| `make examples` | builds the User's Guide's examples with `build/bin/poc`, each `doc/examples` directory in its own under `build/examples`, by the guide's commands (`errors` is left out: it is meant not to compile); not a gate (`doc-users-guide` covers them) |
+| `make examples-vax` | builds the VAX/VMS Guide's programs from `rtl/vax`'s source into `build/examples-vax`, with `PocRtl.mar`, `CoroutineSwitch.mar` and a `BUILD.COM` that assembles those two and runs every program's procedure, and all of it as `build/POC-EXAMPLES.COM`, a kit that unpacks itself: copied to VMS in ASCII mode, it is run in an empty directory, then `@BUILD`; not a gate (`doc-vax-guide` covers them) |
 | `make check-seed` | poc built from the seed builds the same Stage 1 as poc built by voc |
 | `make distcheck` | the release tarball builds without voc and passes `check-install` |
 

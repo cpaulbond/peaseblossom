@@ -74,9 +74,22 @@ CATEGORIZED_TESTS := $(LEXER_TESTS) $(PARSER_TESTS) $(SEMANTIC_TESTS) $(MODULE_T
 # targetable by a single part of the compiler.
 MISC_TESTS := $(filter-out $(CATEGORIZED_TESTS),$(ALL_TESTS))
 
-.PHONY: FORCE all build installable install uninstall check-install installable-vax install-vax uninstall-vax check-install-vax check-install-vax-run seed check-seed doc doc-html doc-pdf doc-all doc-other-html doc-other-pdf dist dist-sign distcheck set-version check-hosts release-files stage1 stage2 test-stage1 check check-stage1 check-strict check-o2 check-opt2 check-lto test test-vax test-vax-asts test-vax-guest-poc vax-v1 vax-stages vax-kit check-vax-kit vax-image test-lexer test-parser test-semantic test-modules test-layout test-llvm test-misc clean clean-build clean-tests
+.PHONY: FORCE all build installable install uninstall check-install installable-vax install-vax uninstall-vax check-install-vax check-install-vax-run seed check-seed doc doc-html doc-pdf doc-all doc-other-html doc-other-pdf dist dist-sign distcheck set-version check-hosts release-files stage1 stage2 test-stage1 check check-stage1 check-strict check-o2 check-opt2 check-lto test test-vax test-vax-asts test-vax-guest-poc vax-v1 vax-stages vax-kit check-vax-kit vax-image examples examples-vax test-lexer test-parser test-semantic test-modules test-layout test-llvm test-misc clean clean-build clean-tests
 
 build: $(BIN) $(call RTL_LIBRARIES,$(BUILD_DIR))
+
+# The guides' example programs, built with build/bin/poc where they can be
+# tried (tools/build-examples): each directory of doc/examples in its own
+# under build/examples, and the VAX/VMS Guide's programs, from rtl/vax's
+# source, all in build/examples-vax with a BUILD.COM that builds them all
+# on VMS, and the lot as a kit that unpacks itself, build/POC-EXAMPLES.COM,
+# to be copied to VMS and run in an empty directory, then @BUILD. Neither is part of make check: doc-users-guide and
+# doc-vax-guide build and run the same programs.
+examples: build
+	$(STAGE0_ENV) tools/build-examples unix $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples
+
+examples-vax: $(BIN)
+	$(STAGE0_ENV) tools/build-examples vax $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples-vax rtl/vax
 
 $(BIN): $(SRCS) $(STAGE0_RTL_SRCS) tools/bootstrap/voc-heap-gc-spill.c $(BUILD_INFO)
 	tools/bootstrap/stage0

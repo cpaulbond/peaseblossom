@@ -1,0 +1,172 @@
+#!/bin/sh
+# The guides' example programs, built where they can be tried: `make
+# examples` and `make examples-vax`.
+#
+# Usage: build-examples unix <poc> <examples dir> <output dir>
+#        build-examples vax <poc> <examples dir> <output dir> <rtl/vax>
+#
+# unix builds each directory under doc/examples but vax into its own
+# directory under the output directory, with the commands the User's Guide
+# gives it: a copy of the directory, then poc on each module in it, or for
+# cpart, library and project the guide's steps. errors is left out, since
+# Errors.Mod is meant not to compile; traps' programs build, and trap when
+# they are run, as the guide says.
+#
+# vax builds every program under doc/examples/vax for VAX/VMS from
+# rtl/vax's source, as doc-vax-guide does, all into the one output
+# directory, which holds, besides each program's MACRO-32 and build
+# procedure, PocRtl.mar, CoroutineSwitch.mar and BUILD.COM, which
+# assembles those two and runs every program's procedure. Beside the
+# directory it writes POC-EXAMPLES.COM, a kit of all of it but the .sym
+# files that unpacks itself: copied to VMS in ASCII mode, it is run in an
+# empty directory, and then BUILD.COM there:
+#
+#   $ @POC-EXAMPLES
+#   $ @BUILD
+#
+# Every program is tried; the exit status is 1 when any failed to build.
+set -u
+LC_ALL=C; export LC_ALL
+
+mode=${1:-}; poc=${2:-}; examples=${3:-}; out=${4:-}
+case $mode in
+  unix) [ $# -eq 4 ] || { echo "usage: build-examples unix <poc> <examples dir> <output dir>" >&2; exit 2; } ;;
+  vax) [ $# -eq 5 ] || { echo "usage: build-examples vax <poc> <examples dir> <output dir> <rtl/vax>" >&2; exit 2; } ;;
+  *) echo "build-examples: unix or vax, not $mode" >&2; exit 2 ;;
+esac
+examples=$(cd "$examples" && pwd) || exit 2
+failed=
+
+# run <directory> <what> <command...>: the command in that directory,
+# noting a failure under <what>
+run() {
+  dir=$1; what=$2; shift 2
+  if (cd "$dir" && "$@"); then :; else
+    echo "build-examples: $what failed" >&2
+    failed="$failed $what"
+  fi
+}
+
+rm -rf "$out"
+mkdir -p "$out" || exit 2
+out=$(cd "$out" && pwd)
+
+if [ $mode = unix ]; then
+  for path in "$examples"/*/; do
+    name=$(basename "$path")
+    case $name in
+      vax) continue ;;
+      errors) echo "errors: left out (Errors.Mod is meant not to compile)"; continue ;;
+    esac
+    echo "$name"
+    cp -R "$examples/$name" "$out/$name"
+    case $name in
+      cpart) run "$out/cpart" cpart "$poc" -import-path hash Digest.Mod ;;
+      library)
+        run "$out/library/greet" library/greet "$poc" -library greet Greet.Mod
+        run "$out/library/app" library/app "$poc" -library-path ../greet App.Mod ;;
+      project) run "$out/project/src" project "$poc" -import-path ../lib Main.Mod ;;
+      *)
+        flags=
+        [ $name = debug ] && flags="-g -opt 0"
+        for module in "$out/$name"/*.Mod; do
+          module=$(basename "$module")
+          run "$out/$name" "$name/$module" "$poc" $flags "$module"
+        done ;;
+    esac
+  done
+else
+  rtl=$(cd "$5" && pwd) || exit 2
+  cp "$examples"/vax/*/*.Mod "$examples"/vax/*/*.cld "$rtl/PocRtl.mar" "$rtl/CoroutineSwitch.mar" "$out/"
+  for path in "$examples"/vax/*/*.Mod; do
+    program=$(basename "$path" .Mod)
+    echo "$program"
+    extra= flags=
+    [ $program = Shell ] && extra=ShellCommands.cld
+    [ $program = Fail ] && flags=-trap-location
+    [ $program = TaskMailbox ] && flags="-link COROUTINESWITCH.OBJ"
+    run "$out" "$program" "$poc" -target vax-dec-vms $flags -import-path "$rtl" \
+      -import-path "$rtl/vms" -import-path "$rtl/vmslib" -build $program.Mod $extra
+  done
+
+  # BUILD.COM: the runtime and the coroutine switch assembled, then each
+  # program's procedure, linking with this POCRTL.OBJ even where an
+  # installed poc defines POC$RTL, which is put back as it was
+  programs=$(cd "$out" && ls *.com | sed 's/\.com$//' | tr a-z A-Z | LC_ALL=C sort)
+  {
+    cat <<'EOF'
+$ ! BUILD.COM: builds the VAX/VMS Guide's example programs, each NAME.EXE,
+$ ! in the current directory, from the MACRO-32 poc wrote for them
+$ ! (tools/build-examples). It links them with the runtime assembled here,
+$ ! whatever POC$RTL says, and leaves POC$RTL as it found it.
+$ OLD_RTL = F$TRNLNM("POC$RTL", "LNM$PROCESS")
+$ HERE = F$ENVIRONMENT("DEFAULT")
+$ DEFINE/NOLOG POC$RTL 'HERE'
+$ ON CONTROL_Y THEN GOTO DONE
+$ ON WARNING THEN GOTO DONE
+$ MACRO/OBJECT POCRTL.MAR
+$ MACRO/OBJECT COROUTINESWITCH.MAR
+EOF
+    for p in $programs; do
+      echo "\$ WRITE SYS\$OUTPUT \"building $p\""
+      echo "\$ @$p"
+    done
+    cat <<'EOF'
+$ WRITE SYS$OUTPUT "built every program: RUN one, or see the guide for its foreign command"
+$DONE:
+$ STATUS = $STATUS
+$ IF OLD_RTL .EQS. "" THEN DEASSIGN POC$RTL
+$ IF OLD_RTL .NES. "" THEN DEFINE/NOLOG POC$RTL "''OLD_RTL'"
+$ EXIT STATUS
+EOF
+  } >"$out/BUILD.COM"
+
+  # the kit: one DCL procedure that unpacks BUILD.COM, then every other
+  # file but the .sym files, which VMS does not need, into the directory
+  # it is run in; as make-vax-kit's kits, each file is "$ CREATE <NAME>",
+  # "$ DECK/DOLLARS=<marker>", its lines and the marker, every name a VMS
+  # one, no line beginning with the marker, none longer than 255
+  kit=$(dirname "$out")/POC-EXAMPLES.COM
+  marker='$_POC_EX_EOF' # DECK takes at most 15 characters
+  files=$(cd "$out" && { echo BUILD.COM; ls | grep -v -e '\.sym$' -e '^BUILD\.COM$' | LC_ALL=C sort; })
+  bad=$(echo "$files" | tr a-z A-Z | grep -Ev '^[A-Z0-9$_-]{1,39}\.[A-Z0-9$_-]{0,39}$' || true)
+  [ -z "$bad" ] || { echo "build-examples: not a VMS file name: $bad" >&2; exit 1; }
+  dup=$(echo "$files" | tr a-z A-Z | sort | uniq -d)
+  [ -z "$dup" ] || { echo "build-examples: two files named $dup on VMS" >&2; exit 1; }
+  for f in $files; do
+    if grep -q "^ *\\$marker" "$out/$f" || awk 'length > 255 { found = 1 } END { exit !found }' "$out/$f"; then
+      echo "build-examples: $f cannot go in the kit (a line too long or beginning $marker)" >&2
+      exit 1
+    fi
+  done
+  {
+    cat <<'EOF'
+$ ! POC-EXAMPLES.COM: the VAX/VMS Guide's example programs, as poc compiled
+$ ! them to MACRO-32, in a kit that unpacks itself (tools/build-examples).
+$ ! Copied to VMS in ASCII mode, it is run in an empty directory:
+$ ! @POC-EXAMPLES, then @BUILD, which assembles poc's runtime and builds
+$ ! every program there. No installed poc is needed.
+$ ON WARNING THEN EXIT $STATUS
+$ IF F$SEARCH("BUILD.COM") .EQS. "" THEN GOTO EMPTY
+$ WRITE SYS$ERROR "POC-EXAMPLES.COM: unpacked here already; use an empty directory"
+$ EXIT %X10000014
+$EMPTY:
+$ WRITE SYS$OUTPUT "unpacking the VAX/VMS Guide's examples"
+EOF
+    for f in $files; do
+      echo "\$ CREATE $(echo "$f" | tr a-z A-Z)"
+      echo "\$ DECK/DOLLARS=\"$marker\""
+      awk '{ print }' "$out/$f"
+      echo "$marker"
+    done
+    echo "\$ WRITE SYS\$OUTPUT \"unpacked; now @BUILD\""
+    echo "\$ EXIT 1"
+  } >"$kit"
+  echo "kit: $kit"
+fi
+
+if [ -n "$failed" ]; then
+  echo "build-examples: failed:$failed" >&2
+  exit 1
+fi
+echo "built in $out"
