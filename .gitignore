@@ -400,4 +400,7 @@ test/conformance/vax-tasks-events/*.com
 test/conformance/vax-tasks-input/work/
 test/conformance/vax-tasks-input/*.com
 !test/conformance/vax-tasks-input/guest-run.com
+test/conformance/vax-tasks-examples/work/
+test/conformance/vax-tasks-examples/*.com
+!test/conformance/vax-tasks-examples/guest-run.com
 test/conformance/vax-tasks-terminal/work/

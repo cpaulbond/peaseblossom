@@ -1275,6 +1275,20 @@ Those fixed while Phase 18 was current, 8-10, are in
     Seen again 2026-11-14 in Phase 10's gate, the objects way on atla,
     with a rerun that passed.
 
+20. **TaskInput takes a failed mailbox read for the end of the input**.
+    Found 2026-11-14, in Tasks Phase 12's `vax-tasks-examples`: a
+    feeder's mailbox made with a maximum message of 64 bytes (`$CREMBX`)
+    gave the spawned Clock "end of input" at its first read, before
+    anything was written. TaskInput reads a mailbox by `$QIO` into its
+    buffer of 512 bytes, the read fails, and `ReadRecord` sets `atEnd` on
+    any failure but `SS$_BUFFEROVF`; the subprocess's DCL then read the
+    commands meant for Clock, and its `STOP` ended the subprocess. With a
+    maximum of 1024 (the fixture's fix) it works. A likely fix: read at
+    most the mailbox's maximum message size (`DVI$_DEVBUFSIZ`, asked for
+    with the device class), and make a failure other than the end of
+    file an error, not the end. The status the read returns is still to
+    be seen.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other

@@ -670,7 +670,7 @@ declarations VMSDEF has already.
 
 ### What is not there yet
 
-voc's library modules (the *User's Guide*, chapter 11), which poc for
+voc's library modules (the *User's Guide*, chapter 13), which poc for
 Unix does not have either. `SYSTEM.CC`, `GETREG` and `PUTREG`. D_floating
 and H_floating, and the vector and privileged system services
 (appendix B).
@@ -3636,7 +3636,7 @@ can come later if a program needs it.
   G_floating (chapter 5), and poc has no type for the others, so the
   routines of `MTH$` and `OTS$` that take or return them are declared,
   with their values as 8 or 16 bytes, but nothing computes with them.
-- **voc's library modules** (the *User's Guide*, chapter 11), which poc
+- **voc's library modules** (the *User's Guide*, chapter 13), which poc
   for Unix does not have either.
 
 ### From VMSDEF

@@ -28,8 +28,9 @@ which fails when what the guide shows is not what poc does.
 9. Calling C
 10. The runtime modules
 11. Coroutines
-12. Coming from voc
-13. poc on VAX/VMS
+12. Tasks
+13. Coming from voc
+14. poc on VAX/VMS
 
 ## 1. Installing
 
@@ -707,6 +708,7 @@ from voc's, its source's first comment says how.
 | `VT100` | the terminal's escape sequences: cursor movement, colors |
 | `GarbageCollectedHeap` | the collector: `Collect`, statistics, and finalizers |
 | `Coroutines` | coroutines: `Init`, `Transfer`, `Free` (section 11) |
+| `Tasks`, `TaskInput` | tasks over coroutines, with channels, and standard input read by a task (section 12) |
 
 Each example below is in `doc/examples/runtime`.
 
@@ -1484,7 +1486,291 @@ its frames can be seen only once it is resumed. On VAX/VMS a traceback,
 or the debugger's `SHOW CALLS`, ends at `POC_COROUTINE_START` in the same
 way.
 
-## 12. Coming from voc
+## 12. Tasks
+
+A task is a coroutine that the module `Tasks` schedules for you: instead
+of naming which coroutine to resume, a task waits - for a message, a
+condition, a time, another task's end - and `Tasks` runs whichever task
+is ready next. Tasks talk through channels, as Go's goroutines do, and
+the main program is a task too.
+
+- A task is an extension of `Tasks.TaskDesc` whose `Run` is its body, an
+  override that must be exported as the base procedure is.
+  `Start(t, stackSize)` gives it a stack, by `Coroutines.Init`'s rules,
+  and it runs when the running task waits. Returning from `Run` ends the
+  task. `Join(t)` waits for it to end, and `Done(t)` says whether it has.
+- A message is an extension of `Tasks.MessageDesc`, unpacked by a type
+  guard, and `NIL` is a message too. `NewChannel(n)` makes a channel that
+  holds up to `n` messages; with 0, `Send` waits for a receiver.
+  `Receive(ch, m)` waits for one, and returns `FALSE` once the channel is
+  closed (`Close`) and empty.
+- `Select(from, m)` receives from whichever channel of the array `from`
+  has a message first, and returns its index. It passes over a `NIL`
+  entry. `After(ms)` is a channel that gets one message, `NIL`, after `ms`
+  milliseconds, so that a timeout is a channel among the others.
+- `Sleep(ms)` waits for a time; `Yield` lets the other ready tasks run
+  first. `Condition` (`Wait`, `Signal`, `Broadcast`) and `Mutex` (`Lock`,
+  `Unlock`) are there for tasks that share variables, and an `Event`
+  (`Await`, `Post`) is how a signal handler wakes a task.
+- `TaskInput` reads standard input as `In` does (`Char`, `Line`, `Done`),
+  but only the reading task waits for the input; the others go on.
+
+Nothing preempts. A task runs until it waits, and only then can another
+run, so the code between two waits is atomic. Each example below is in
+`doc/examples/tasks`.
+
+**A chain of filters.** `Primes` is the concurrent prime sieve from Go's
+tutorial. A generator task sends 2, 3, 4, ... into a channel. The main
+program takes the first number from the chain's end: it is a prime, so
+the main program prints it and adds a filter task for it at the end of
+the chain. That task passes on, to a new channel, every number its prime
+does not divide. Each number that reaches the end of the chain is
+therefore a prime.
+
+<!-- example: tasks/Primes.Mod -->
+```
+MODULE Primes;  (* the first n primes, by a chain of filter tasks *)
+
+  IMPORT Tasks, Args, Out;
+
+  CONST stackSize = 16384;   (* each task's; Coroutines raises it to its least *)
+
+  TYPE
+    Number = POINTER TO NumberDesc;
+    NumberDesc = RECORD (Tasks.MessageDesc) value: LONGINT END;
+    Generator = POINTER TO GeneratorDesc;
+    GeneratorDesc = RECORD (Tasks.TaskDesc) out: Tasks.Channel END;
+    Filter = POINTER TO FilterDesc;
+    FilterDesc = RECORD (Tasks.TaskDesc)
+      in, out: Tasks.Channel;
+      prime: LONGINT
+    END;
+
+  VAR
+    count, i: LONGINT;
+    channel: Tasks.Channel;
+    generator: Generator;
+    filter: Filter;
+    m: Tasks.Message;
+
+  (* Sends 2, 3, 4, ... for ever *)
+  PROCEDURE (g: Generator) Run*;
+    VAR n: Number; i: LONGINT;
+  BEGIN
+    i := 2;
+    LOOP NEW(n); n.value := i; Tasks.Send(g.out, n); INC(i) END
+  END Run;
+
+  (* Passes on the numbers its prime does not divide *)
+  PROCEDURE (f: Filter) Run*;
+    VAR m: Tasks.Message;
+  BEGIN
+    WHILE Tasks.Receive(f.in, m) DO
+      IF m(Number).value MOD f.prime # 0 THEN Tasks.Send(f.out, m) END
+    END
+  END Run;
+
+BEGIN
+  count := 10;
+  IF Args.argc > 1 THEN Args.GetInt(1, count) END;
+  channel := Tasks.NewChannel(0);
+  NEW(generator); generator.out := channel;
+  Tasks.Start(generator, stackSize);
+  (* The first number out of the chain is a prime; it gets a filter of
+     its own at the chain's end. *)
+  FOR i := 1 TO count DO
+    IF Tasks.Receive(channel, m) THEN
+      Out.Int(m(Number).value, 0); Out.Ln;
+      NEW(filter); filter.in := channel; filter.prime := m(Number).value;
+      channel := Tasks.NewChannel(0); filter.out := channel;
+      Tasks.Start(filter, stackSize)
+    END
+  END
+END Primes.
+```
+
+`primes [count]` prints the first `count` primes, 10 if not given:
+
+<!-- run: tasks -->
+```
+$ poc Primes.Mod
+$ ./Primes 5
+2
+3
+5
+7
+11
+$ ./Primes 1000 | tail -n 1
+7919
+```
+
+The channels have capacity 0, so each number passes from task to task in
+step. The program ends when the main body does, as in Go: the generator
+and the filters are still waiting for their next number, and they are
+abandoned there. A program that must let a task finish waits for it with
+`Join`.
+
+**Ticks, commands and a timeout.** `Clock` is a stopwatch. A ticker task
+sends a message every tenth of a second; a reader task sends each line of
+standard input as a command; and the main program waits on both with
+`Select`. When the clock is stopped, the main program also waits on a
+timeout, a new `After` channel after each command. When the clock is
+running, that entry is `NIL`, so `Select` passes it over.
+
+<!-- example: tasks/Clock.Mod -->
+```
+MODULE Clock;  (* a stopwatch: ticks, typed commands, and a timeout *)
+
+  IMPORT Tasks, TaskInput, Args, Out;
+
+  CONST tick = 100;   (* milliseconds *)
+
+  TYPE
+    Ticker = POINTER TO TickerDesc;
+    TickerDesc = RECORD (Tasks.TaskDesc) ticks: Tasks.Channel END;
+    Reader = POINTER TO ReaderDesc;
+    ReaderDesc = RECORD (Tasks.TaskDesc) commands: Tasks.Channel END;
+    Command = POINTER TO CommandDesc;
+    CommandDesc = RECORD (Tasks.MessageDesc) text: ARRAY 32 OF CHAR END;
+
+  VAR
+    ticker: Ticker;
+    reader: Reader;
+    from: ARRAY 3 OF Tasks.Channel;   (* ticks, commands, the timeout *)
+    m: Tasks.Message;
+    idle: LONGINT;     (* seconds a stopped clock waits for a command *)
+    tenths: LONGINT;   (* the time the clock has run *)
+    running, done: BOOLEAN;
+
+  (* A tick, NIL, every tenth of a second, for ever *)
+  PROCEDURE (t: Ticker) Run*;
+  BEGIN
+    LOOP Tasks.Sleep(tick); Tasks.Send(t.ticks, NIL) END
+  END Run;
+
+  (* Each line of the input as a command, then NIL *)
+  PROCEDURE (r: Reader) Run*;
+    VAR c: Command;
+  BEGIN
+    LOOP
+      NEW(c); TaskInput.Line(c.text);
+      IF ~TaskInput.Done THEN EXIT END;
+      Tasks.Send(r.commands, c)
+    END;
+    Tasks.Send(r.commands, NIL)
+  END Run;
+
+  PROCEDURE ShowTime;
+    VAR seconds: LONGINT;
+  BEGIN
+    seconds := tenths DIV 10;
+    Out.Int(seconds DIV 60, 0); Out.Char(":");
+    Out.Int(seconds MOD 60 DIV 10, 0); Out.Int(seconds MOD 10, 0)
+  END ShowTime;
+
+  (* A stopped clock waits idle seconds for a command; a running one
+     waits for ever. *)
+  PROCEDURE SetTimeout;
+  BEGIN
+    IF running THEN from[2] := NIL ELSE from[2] := Tasks.After(idle * 1000) END
+  END SetTimeout;
+
+  PROCEDURE Obey(command: ARRAY OF CHAR);
+  BEGIN
+    IF command = "start" THEN running := TRUE; Out.String("started")
+    ELSIF command = "stop" THEN
+      running := FALSE; Out.String("stopped at "); ShowTime
+    ELSIF command = "lap" THEN Out.String("lap "); ShowTime
+    ELSIF command = "reset" THEN tenths := 0; Out.String("reset")
+    ELSIF command = "quit" THEN done := TRUE; Out.String("quit")
+    ELSE Out.String("start, stop, lap, reset or quit")
+    END;
+    Out.Ln
+  END Obey;
+
+BEGIN
+  idle := 60;
+  IF Args.argc > 1 THEN Args.GetInt(1, idle) END;
+  NEW(ticker); ticker.ticks := Tasks.NewChannel(1);
+  Tasks.Start(ticker, Tasks.DefaultStackSize);
+  NEW(reader); reader.commands := Tasks.NewChannel(0);
+  Tasks.Start(reader, Tasks.DefaultStackSize);
+  from[0] := ticker.ticks; from[1] := reader.commands;
+  SetTimeout;
+  REPEAT
+    CASE Tasks.Select(from, m) OF
+      0: IF running THEN
+           INC(tenths);
+           IF tenths MOD 10 = 0 THEN ShowTime; Out.Ln END
+         END
+    | 1: IF m = NIL THEN Out.String("end of input"); Out.Ln; done := TRUE
+         ELSE Obey(m(Command).text); SetTimeout
+         END
+    | 2: Out.String("no command for "); Out.Int(idle, 0);
+         Out.String(" seconds"); Out.Ln; done := TRUE
+    END
+  UNTIL done
+END Clock.
+```
+
+`clock [seconds]` takes the commands `start`, `stop`, `lap`, `reset` and
+`quit`, one a line. A stopped clock ends after `seconds` with no command,
+60 if not given. Typed at a terminal, the commands come as the user types
+them. Here they come from a script that sleeps between them:
+
+<!-- run: tasks -->
+```
+$ poc Clock.Mod
+$ (echo start; sleep 2.5; echo lap; sleep 1; echo stop; sleep 3) | ./Clock 2
+started
+0:01
+0:02
+lap 0:02
+0:03
+stopped at 0:03
+no command for 2 seconds
+$ printf 'start\nstop\nwhat\n' | ./Clock
+started
+stopped at 0:00
+start, stop, lap, reset or quit
+end of input
+```
+
+While the reader waits for a line, the ticker and the main program run.
+`In` would have stopped them all.
+
+Both programs run unchanged on VAX/VMS, as foreign commands
+(`CLOCK :== $DEV:[DIR]CLOCK.EXE`, then `CLOCK 30`). A program built from
+`rtl/vax`'s source links `COROUTINESWITCH.OBJ`, as a program that uses
+coroutines does (the *VAX/VMS Guide*, "Coroutines"). On a terminal,
+`TaskInput` keeps reading while the other tasks write: their lines break
+through the read, and VMS writes again what has been typed so far.
+
+**The rules.** `Coroutines`' rules hold for each task's stack (section
+11): a stack is fixed when the task starts, and a deep recursion needs a
+stack sized for it. Also:
+
+- **A blocking call stops every task.** `Sleep`, `TaskInput` and
+  `Tasks`' own waits let the others run; `In`, `Files` and a call to C
+  wait for the whole program. A program reads standard input through `In`
+  or through `TaskInput`, not both.
+- **All tasks blocked** traps (status 19): the running task waits, and no
+  other task is ready, no timer is pending, and nothing outside the
+  program (a descriptor, an `Event`) can wake one.
+- **Misuse traps** (status 20), with a message that says which: an
+  `Unlock` of a mutex the task does not hold, a `Join` of the running
+  task, a `Send` on a closed channel, a second `Close` or `Start`, a
+  negative capacity, and on VAX/VMS `AwaitReadable` and `AwaitWritable`,
+  which are POSIX's.
+- **A signal handler may only `Post`** an `Event` (on VAX/VMS, an AST
+  too), and never allocates.
+- **The program has one thread.** It must not start another, from C
+  either.
+
+The Reference Guide's "Tasks" has the rest: `Yield`, conditions and
+mutexes, `Event`, and replacing the idle wait.
+
+## 13. Coming from voc
 
 poc reads what voc reads, with the same two size models, and a program
 written for voc usually builds unchanged. What differs:
@@ -1526,7 +1812,7 @@ and `SYSTEM.CARD`, with `VAL` to cross to the signed ones, which
 voc does not have (Reference Guide, "Unsigned integer types"). `-strict`
 rejects them all.
 
-## 13. poc on VAX/VMS
+## 14. poc on VAX/VMS
 
 poc also compiles for VAX/VMS 5.5-2, writing VAX MACRO-32 that VMS's own
 assembler and linker make into an image. It does so on Unix as a
