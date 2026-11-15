@@ -25,7 +25,7 @@
 %global __provides_exclude_from ^%{_prefix}/lib/poc/.*$
 
 Name:           peaseblossom
-Version:        0.11.2
+Version:        0.12.0
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
@@ -110,6 +110,16 @@ test/install/check-vax.sh %{buildroot}%{_bindir}/poc %{_builddir}/check-install-
 %{_docdir}/%{name}-vax/
 
 %changelog
+* Sat Nov 14 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.12.0-1
+- Update to 0.12.0: the runtime modules Coroutines (Oakwood's Init and
+  Transfer, with Free and DefaultStackSize) and Tasks (cooperative tasks
+  over Coroutines: conditions, mutexes, channels, Select, timeouts,
+  Sleep, and Post for signal handlers and ASTs), with TaskInput, on
+  both back ends; the rules for threads and signal handlers; Debian
+  packages; make examples and make examples-vax, which builds the
+  VAX/VMS Guide's examples as a kit that unpacks itself on VMS. The
+  compiler is unchanged; a library from an older poc must be rebuilt.
+
 * Sat Nov 07 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.11.2-1
 - Update to 0.11.2: the VAX/VMS base kit has BUILDVIAOBJ.COM, which
   rebuilds poc on VMS through its object back end, checks that poc so

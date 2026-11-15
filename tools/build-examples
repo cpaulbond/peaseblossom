@@ -3,7 +3,7 @@
 # examples` and `make examples-vax`.
 #
 # Usage: build-examples unix <poc> <examples dir> <output dir>
-#        build-examples vax <poc> <examples dir> <output dir> <rtl/vax>
+#        build-examples vax <poc> <examples dir> <output dir> <rtl/vax> <kit>
 #
 # unix builds each directory under doc/examples but vax into its own
 # directory under the output directory, with the commands the User's Guide
@@ -16,12 +16,13 @@
 # rtl/vax's source, as doc-vax-guide does, all into the one output
 # directory, which holds, besides each program's MACRO-32 and build
 # procedure, PocRtl.mar, CoroutineSwitch.mar and BUILD.COM, which
-# assembles those two and runs every program's procedure. Beside the
-# directory it writes POC-EXAMPLES.COM, a kit of all of it but the .sym
-# files that unpacks itself: copied to VMS in ASCII mode, it is run in an
-# empty directory, and then BUILD.COM there:
+# assembles those two and runs every program's procedure. It also writes
+# <kit>, a kit of all of it but the .sym files that unpacks itself, named
+# POC-EXAMPLES-<version>.COM by make examples-vax and make dist (a
+# release's file): copied to VMS in ASCII mode, it is run in an empty
+# directory, and then BUILD.COM there:
 #
-#   $ @POC-EXAMPLES
+#   $ @POC-EXAMPLES-0-12-0
 #   $ @BUILD
 #
 # Every program is tried; the exit status is 1 when any failed to build.
@@ -31,7 +32,7 @@ LC_ALL=C; export LC_ALL
 mode=${1:-}; poc=${2:-}; examples=${3:-}; out=${4:-}
 case $mode in
   unix) [ $# -eq 4 ] || { echo "usage: build-examples unix <poc> <examples dir> <output dir>" >&2; exit 2; } ;;
-  vax) [ $# -eq 5 ] || { echo "usage: build-examples vax <poc> <examples dir> <output dir> <rtl/vax>" >&2; exit 2; } ;;
+  vax) [ $# -eq 6 ] || { echo "usage: build-examples vax <poc> <examples dir> <output dir> <rtl/vax> <kit>" >&2; exit 2; } ;;
   *) echo "build-examples: unix or vax, not $mode" >&2; exit 2 ;;
 esac
 examples=$(cd "$examples" && pwd) || exit 2
@@ -126,7 +127,10 @@ EOF
   # it is run in; as make-vax-kit's kits, each file is "$ CREATE <NAME>",
   # "$ DECK/DOLLARS=<marker>", its lines and the marker, every name a VMS
   # one, no line beginning with the marker, none longer than 255
-  kit=$(dirname "$out")/POC-EXAMPLES.COM
+  kit=$6
+  kitName=$(basename "$kit" | tr a-z A-Z)
+  echo "$kitName" | grep -Eq '^[A-Z0-9$_-]{1,39}\.COM$' ||
+    { echo "build-examples: the kit's name is not NAME.COM, a VMS name: $kitName" >&2; exit 2; }
   marker='$_POC_EX_EOF' # DECK takes at most 15 characters
   files=$(cd "$out" && { echo BUILD.COM; ls | grep -v -e '\.sym$' -e '^BUILD\.COM$' | LC_ALL=C sort; })
   bad=$(echo "$files" | tr a-z A-Z | grep -Ev '^[A-Z0-9$_-]{1,39}\.[A-Z0-9$_-]{0,39}$' || true)
@@ -140,15 +144,17 @@ EOF
     fi
   done
   {
+    cat <<EOF
+\$ ! $kitName: the VAX/VMS Guide's example programs, as poc compiled
+\$ ! them to MACRO-32, in a kit that unpacks itself (tools/build-examples).
+\$ ! Copied to VMS in ASCII mode, it is run in an empty directory:
+\$ ! @${kitName%.COM}, then @BUILD, which assembles poc's runtime and builds
+\$ ! every program there. No installed poc is needed.
+EOF
     cat <<'EOF'
-$ ! POC-EXAMPLES.COM: the VAX/VMS Guide's example programs, as poc compiled
-$ ! them to MACRO-32, in a kit that unpacks itself (tools/build-examples).
-$ ! Copied to VMS in ASCII mode, it is run in an empty directory:
-$ ! @POC-EXAMPLES, then @BUILD, which assembles poc's runtime and builds
-$ ! every program there. No installed poc is needed.
 $ ON WARNING THEN EXIT $STATUS
 $ IF F$SEARCH("BUILD.COM") .EQS. "" THEN GOTO EMPTY
-$ WRITE SYS$ERROR "POC-EXAMPLES.COM: unpacked here already; use an empty directory"
+$ WRITE SYS$ERROR "the examples are unpacked here already; use an empty directory"
 $ EXIT %X10000014
 $EMPTY:
 $ WRITE SYS$OUTPUT "unpacking the VAX/VMS Guide's examples"

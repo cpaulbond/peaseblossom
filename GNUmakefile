@@ -82,14 +82,15 @@ build: $(BIN) $(call RTL_LIBRARIES,$(BUILD_DIR))
 # tried (tools/build-examples): each directory of doc/examples in its own
 # under build/examples, and the VAX/VMS Guide's programs, from rtl/vax's
 # source, all in build/examples-vax with a BUILD.COM that builds them all
-# on VMS, and the lot as a kit that unpacks itself, build/POC-EXAMPLES.COM,
-# to be copied to VMS and run in an empty directory, then @BUILD. Neither is part of make check: doc-users-guide and
+# on VMS, and the lot as a kit that unpacks itself,
+# build/POC-EXAMPLES-<version>.COM (make dist writes it too), to be copied to VMS and run in an empty directory, then @BUILD. Neither is part of make check: doc-users-guide and
 # doc-vax-guide build and run the same programs.
 examples: build
 	$(STAGE0_ENV) tools/build-examples unix $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples
 
 examples-vax: $(BIN)
-	$(STAGE0_ENV) tools/build-examples vax $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples-vax rtl/vax
+	$(STAGE0_ENV) tools/build-examples vax $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples-vax rtl/vax \
+	  $(BUILD_DIR)/$(EXAMPLES_KIT_NAME)
 
 $(BIN): $(SRCS) $(STAGE0_RTL_SRCS) tools/bootstrap/voc-heap-gc-spill.c $(BUILD_INFO)
 	tools/bootstrap/stage0
@@ -520,6 +521,8 @@ $(DOC_OTHER_DIR)/pdf/%.pdf: doc/%.md tools/doc/pdf.lua tools/doc/pdf-header.tex
 # products or test outputs), the bootstrap seed as seed/, the two kits of
 # poc for VAX/VMS as vax/POC-<version>.COM and vax/POC-VMS-<version>.COM
 # (Phase 17 step 7), which are also written beside the tarball, the
+# VAX/VMS Guide's examples as a kit, POC-EXAMPLES-<version>.COM, beside it
+# too (make examples-vax), the
 # documents as
 # HTML and PDF in doc/html and doc/pdf (make doc), and COMMIT, the
 # commit, which tools/build-info reads where there is no .git. Refused
@@ -537,6 +540,9 @@ DIST_TARBALL := $(DIST_DIR)/$(DIST_NAME).tar.gz
 # STARLET kit (tools/bootstrap/make-vax-kit), in the tarball as vax/ and
 # beside it, each a release's file of its own
 VAX_KIT_NAMES := POC-$(subst .,-,$(VERSION)).COM POC-VMS-$(subst .,-,$(VERSION)).COM
+# the VAX/VMS Guide's examples as a kit (make examples-vax), a release's
+# file too, which make dist writes beside the tarball with the Stage 2 poc
+EXAMPLES_KIT_NAME := POC-EXAMPLES-$(subst .,-,$(VERSION)).COM
 
 dist: $(STAGE2_BIN) doc
 	@git diff --quiet HEAD -- || { echo "dist: the tracked files differ from HEAD; commit first"; exit 1; }
@@ -557,6 +563,9 @@ dist: $(STAGE2_BIN) doc
 	mkdir -p $(DIST_DIR)/$(DIST_NAME)/vax
 	cd $(DIST_DIR)/vax-kit && cp $(VAX_KIT_NAMES) ../$(DIST_NAME)/vax/ && mv $(VAX_KIT_NAMES) ..
 	rm -rf $(DIST_DIR)/vax-kit
+	tools/build-examples vax $(abspath $(STAGE2_BIN)) doc/examples $(DIST_DIR)/examples-vax rtl/vax \
+	  $(DIST_DIR)/$(EXAMPLES_KIT_NAME) >/dev/null
+	rm -rf $(DIST_DIR)/examples-vax
 	cd $(DIST_DIR) && tar -cf - $(DIST_NAME) | gzip -9 > $(DIST_NAME).tar.gz
 	cd $(DIST_DIR) && if command -v sha256sum >/dev/null; then sha256sum $(DIST_NAME).tar.gz; \
 	  else sha256 -r $(DIST_NAME).tar.gz; fi > $(DIST_NAME).tar.gz.sha256

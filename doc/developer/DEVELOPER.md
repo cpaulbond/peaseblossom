@@ -110,7 +110,7 @@ writes `build/gen/BuildInfo.Mod` with the commit on every build, so `poc
 | `make check-install` | installs into a scratch directory and runs `test/install/check.sh` with only that poc and clang |
 | `make check-install-vax` | installs poc and `make install-vax`'s libraries, kits and guide into a scratch directory and runs `test/install/check-vax.sh`, which builds programs for the VAX with that poc alone (no guest); from a git checkout without pandoc, it leaves the guide out (`VAX_GUIDE=no`) and says so |
 | `make examples` | builds the User's Guide's examples with `build/bin/poc`, each `doc/examples` directory in its own under `build/examples`, by the guide's commands (`errors` is left out: it is meant not to compile); not a gate (`doc-users-guide` covers them) |
-| `make examples-vax` | builds the VAX/VMS Guide's programs from `rtl/vax`'s source into `build/examples-vax`, with `PocRtl.mar`, `CoroutineSwitch.mar` and a `BUILD.COM` that assembles those two and runs every program's procedure, and all of it as `build/POC-EXAMPLES.COM`, a kit that unpacks itself: copied to VMS in ASCII mode, it is run in an empty directory, then `@BUILD`; not a gate (`doc-vax-guide` covers them) |
+| `make examples-vax` | builds the VAX/VMS Guide's programs from `rtl/vax`'s source into `build/examples-vax`, with `PocRtl.mar`, `CoroutineSwitch.mar` and a `BUILD.COM` that assembles those two and runs every program's procedure, and all of it as `build/POC-EXAMPLES-<version>.COM`, a kit that unpacks itself (`make dist` writes it too, a release's file): copied to VMS in ASCII mode, it is run in an empty directory, then `@BUILD`; not a gate (`doc-vax-guide` covers them) |
 | `make check-seed` | poc built from the seed builds the same Stage 1 as poc built by voc |
 | `make distcheck` | the release tarball builds without voc and passes `check-install` |
 
@@ -588,7 +588,9 @@ the names, and the variables that give them to the tools, are yours.
    `build/dist/POC-<version>.COM` and `POC-VMS-<version>.COM` (the
    version's periods made hyphens; `tools/bootstrap/make-vax-kit`,
    `vax-macro32-backend.md` section 21), and puts copies in the tarball as
-   `vax/`. It runs `make doc` (section 2), and puts the HTML
+   `vax/`, and the VAX/VMS Guide's examples as a kit,
+   `build/dist/POC-EXAMPLES-<version>.COM` (`make examples-vax`), not in
+   the tarball, which builds it from `doc/examples`. It runs `make doc` (section 2), and puts the HTML
    and PDF documents in the tarball, as `doc/html` and `doc/pdf`, and the
    VAX/VMS Guide as text, as `doc/text`, so that a package needs no
    document tools: `install-vax` takes the kits and the guide from there. Each `make dist` writes a new tarball (tar and
@@ -611,7 +613,8 @@ the names, and the variables that give them to the tools, are yours.
    kits:
 
        gh release create v0.1.0 build/dist/peaseblossom-0.1.0.tar.gz{,.sha256,.asc} \
-         build/dist/POC-0-1-0.COM build/dist/POC-VMS-0-1-0.COM --title "Peaseblossom 0.1.0" --notes-file <notes>
+         build/dist/POC-0-1-0.COM build/dist/POC-VMS-0-1-0.COM \
+         build/dist/POC-EXAMPLES-0-1-0.COM --title "Peaseblossom 0.1.0" --notes-file <notes>
 
    and on the project's own site. Besides what changed, the notes say how
    to install each package (`INSTALL.md`, section 5, "Installing a
@@ -660,7 +663,8 @@ the names, and the variables that give them to the tools, are yours.
 
    `make release-files` (`tools/release-files`) gathers them in
    `build/release/<version>/`:
-   - the tarball's three files, and the VAX/VMS kit, from `build/dist`;
+   - the tarball's three files, the two VAX/VMS kits and the examples'
+     kit, from `build/dist`;
    - the RPMs from `~/rpmbuild` (`RPM_DIR`);
    - each BSD package by `scp` from the host that built it, named for that
      host's `uname`. `FREEBSD_HOSTS`, `OPENBSD_HOSTS` and `NETBSD_HOSTS`

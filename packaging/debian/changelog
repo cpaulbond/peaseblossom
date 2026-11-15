@@ -1,3 +1,13 @@
+peaseblossom (0.12.0-1) unstable; urgency=medium
+
+  * Update to 0.12.0: the runtime modules Coroutines and Tasks
+    (cooperative tasks: conditions, mutexes, channels, Select,
+    timeouts), with TaskInput, on both back ends; make examples and
+    make examples-vax. The compiler is unchanged; a library from an
+    older poc must be rebuilt.
+
+ -- T. Kurt Bond <tkurtbond@gmail.com>  Sat, 14 Nov 2026 22:32:39 -0500
+
 peaseblossom (0.11.2-1) unstable; urgency=medium
 
   * First Debian package, for trixie on amd64 and arm64: poc and poc-rtl
