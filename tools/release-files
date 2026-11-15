@@ -2,8 +2,8 @@
 # Gathers the files a release attaches (doc/developer/DEVELOPER.md, section
 # 7, step 7) into build/release/<version>/: the tarball with its .sha256
 # and .asc, the two kits of poc for VAX/VMS, POC-<version>.COM and
-# POC-VMS-<version>.COM, and the examples' kit, POC-EXAMPLES-<version>.COM, from
-# build/dist (make distcheck and make dist-sign); the RPMs,
+# POC-VMS-<version>.COM, and the examples' two kits, POC-EXAMPLES-<version>.COM
+# and POC-EXAMPLES-SOURCE-<version>.COM, from build/dist (make distcheck and make dist-sign); the RPMs,
 # binary and source, from ~/rpmbuild (RPM_DIR), with peaseblossom-vax's,
 # noarch; and each BSD package, by scp from the host that built it
 # (section 6), renamed for its system as uname there says, e.g.
@@ -56,8 +56,10 @@ done
 # (Phase 17 step 7; doc/developer/vax-macro32-backend.md, section 21)
 take "$ROOT/build/dist/POC-$(echo "$version" | tr . -).COM"
 take "$ROOT/build/dist/POC-VMS-$(echo "$version" | tr . -).COM"
-# and the VAX/VMS Guide's examples as a kit (make examples-vax)
+# and the VAX/VMS Guide's examples as two kits (make examples-vax and
+# make examples-vax-source)
 take "$ROOT/build/dist/POC-EXAMPLES-$(echo "$version" | tr . -).COM"
+take "$ROOT/build/dist/POC-EXAMPLES-SOURCE-$(echo "$version" | tr . -).COM"
 
 # take_one PATTERN: takes the one file PATTERN matches, or refuses,
 # naming them all

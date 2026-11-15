@@ -1618,6 +1618,34 @@ Those done while Phase 18 was current, 5-7, are in
       KITHELLO from the installed poc, in about an hour in all. Released
       in 0.11.2.
 
+12. The examples as source, for a VMS site with poc installed [done] (the
+    user, 2026-11-15): a second kit of the VAX/VMS Guide's examples,
+    `POC-EXAMPLES-SOURCE-<version>.COM` (`make examples-vax-source`,
+    `tools/build-examples-source`), holds their Oberon-2 source rather
+    than MACRO-32 poc wrote on Unix, so that a site can change a program
+    and build it again with the installed poc, the foreign command `POC`,
+    through its object back end. Its `BUILD.COM` builds each program
+    whose `.EXE` is missing or older than its `.MOD` (or Shell's
+    `.CLD`), by revision date, with the options the guide gives it
+    (Fail `-TRAP-LOCATION`, Shell `SHELLCOMMANDS.CLD`); `@BUILD ALL`
+    builds every one and `@BUILD NAME` that one. Run again, the kit
+    unpacks only the files that are missing, so a changed source is
+    kept. It is a release file beside `POC-EXAMPLES-<version>.COM` (`make
+    dist`, `tools/release-files`). Both kits now also hold the User's
+    Guide's coroutine programs `Queens` and `WordSets`, with `WordSets`'
+    `memo.txt` and `words.txt`, which the VAX/VMS Guide names and which
+    run there unchanged; in the MACRO-32 kit they link
+    `COROUTINESWITCH.OBJ`, as `TaskMailbox` does.
+    - **Checked on the guest** (2026-11-15, user TKB, poc 0.12.0
+      installed, scratch directories since deleted): the source kit
+      unpacked its files, `@BUILD` built all 21 programs, and again built
+      none; the kit with `Queens` and `WordSets` added, run again there,
+      kept the 23 files and unpacked the four new ones; after a line was
+      appended to `HELLO.MOD`, `@BUILD` built just `HELLO`, `QUEENS` and
+      `WORDSETS`. The MACRO-32 kit, in an empty directory, built all 23
+      programs. `HELLO`, `QUEENS` and `WORDSETS` ran as the guides show
+      from both.
+
 ## Open design questions
 
 - **The lowest 32-bit x86 CPU** (deferred from Phase 11 to Phase 12 on

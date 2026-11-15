@@ -110,7 +110,8 @@ writes `build/gen/BuildInfo.Mod` with the commit on every build, so `poc
 | `make check-install` | installs into a scratch directory and runs `test/install/check.sh` with only that poc and clang |
 | `make check-install-vax` | installs poc and `make install-vax`'s libraries, kits and guide into a scratch directory and runs `test/install/check-vax.sh`, which builds programs for the VAX with that poc alone (no guest); from a git checkout without pandoc, it leaves the guide out (`VAX_GUIDE=no`) and says so |
 | `make examples` | builds the User's Guide's examples with `build/bin/poc`, each `doc/examples` directory in its own under `build/examples`, by the guide's commands (`errors` is left out: it is meant not to compile); not a gate (`doc-users-guide` covers them) |
-| `make examples-vax` | builds the VAX/VMS Guide's programs from `rtl/vax`'s source into `build/examples-vax`, with `PocRtl.mar`, `CoroutineSwitch.mar` and a `BUILD.COM` that assembles those two and runs every program's procedure, and all of it as `build/POC-EXAMPLES-<version>.COM`, a kit that unpacks itself (`make dist` writes it too, a release's file): copied to VMS in ASCII mode, it is run in an empty directory, then `@BUILD`; not a gate (`doc-vax-guide` covers them) |
+| `make examples-vax` | builds the VAX/VMS Guide's programs, and the User's Guide's coroutine programs `Queens` and `WordSets` with `WordSets`' two files, from `rtl/vax`'s source into `build/examples-vax`, with `PocRtl.mar`, `CoroutineSwitch.mar` and a `BUILD.COM` that assembles those two and runs every program's procedure, and all of it as `build/POC-EXAMPLES-<version>.COM`, a kit that unpacks itself (`make dist` writes it too, a release's file): copied to VMS in ASCII mode, it is run in an empty directory, then `@BUILD`; not a gate (`doc-vax-guide` covers them) |
+| `make examples-vax-source` | writes the same programs' Oberon-2 source as `build/POC-EXAMPLES-SOURCE-<version>.COM` (`tools/build-examples-source`), a kit for a VMS system with poc installed as the foreign command `POC`: run in a directory of its own, it unpacks the `.MOD` and `.CLD` files and a `BUILD.COM`; `@BUILD` compiles and links each program whose `.EXE` is missing or older than its source, `@BUILD ALL` every one, `@BUILD NAME` that one. Run again, the kit unpacks only missing files, so changes are kept; not a gate |
 | `make check-seed` | poc built from the seed builds the same Stage 1 as poc built by voc |
 | `make distcheck` | the release tarball builds without voc and passes `check-install` |
 
@@ -588,9 +589,11 @@ the names, and the variables that give them to the tools, are yours.
    `build/dist/POC-<version>.COM` and `POC-VMS-<version>.COM` (the
    version's periods made hyphens; `tools/bootstrap/make-vax-kit`,
    `vax-macro32-backend.md` section 21), and puts copies in the tarball as
-   `vax/`, and the VAX/VMS Guide's examples as a kit,
-   `build/dist/POC-EXAMPLES-<version>.COM` (`make examples-vax`), not in
-   the tarball, which builds it from `doc/examples`. It runs `make doc` (section 2), and puts the HTML
+   `vax/`, and the VAX/VMS Guide's examples as two kits,
+   `build/dist/POC-EXAMPLES-<version>.COM` (`make examples-vax`) and
+   their source, `build/dist/POC-EXAMPLES-SOURCE-<version>.COM` (`make
+   examples-vax-source`), not in the tarball, which builds them from
+   `doc/examples`. It runs `make doc` (section 2), and puts the HTML
    and PDF documents in the tarball, as `doc/html` and `doc/pdf`, and the
    VAX/VMS Guide as text, as `doc/text`, so that a package needs no
    document tools: `install-vax` takes the kits and the guide from there. Each `make dist` writes a new tarball (tar and
@@ -614,7 +617,7 @@ the names, and the variables that give them to the tools, are yours.
 
        gh release create v0.1.0 build/dist/peaseblossom-0.1.0.tar.gz{,.sha256,.asc} \
          build/dist/POC-0-1-0.COM build/dist/POC-VMS-0-1-0.COM \
-         build/dist/POC-EXAMPLES-0-1-0.COM --title "Peaseblossom 0.1.0" --notes-file <notes>
+         build/dist/POC-EXAMPLES-0-1-0.COM build/dist/POC-EXAMPLES-SOURCE-0-1-0.COM --title "Peaseblossom 0.1.0" --notes-file <notes>
 
    and on the project's own site. Besides what changed, the notes say how
    to install each package (`INSTALL.md`, section 5, "Installing a

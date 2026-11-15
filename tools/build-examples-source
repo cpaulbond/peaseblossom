@@ -1,0 +1,198 @@
+#!/bin/sh
+# The VAX/VMS Guide's example programs as Oberon-2 source, in a kit for a
+# VMS system with poc installed: `make examples-vax-source`.
+#
+# Usage: build-examples-source <examples dir> <kit>
+#
+# <kit>, named POC-EXAMPLES-SOURCE-<version>.COM by make examples-vax-source
+# and make dist (a release's file), is a DCL
+# procedure that unpacks every .Mod and .cld under <examples dir>/vax, the
+# User's Guide's two coroutine programs, Queens and WordSets, which the
+# VAX/VMS Guide names and which run there unchanged, with WordSets' two
+# files, and a BUILD.COM into the directory it is run in. Copied to VMS in ASCII
+# mode, it is run, and then BUILD.COM, which compiles each program with
+# the installed poc (the foreign command POC) to .OBJ files and links it
+# with the procedure poc writes:
+#
+#   $ @POC-EXAMPLES-SOURCE-0-12-0
+#   $ @BUILD
+#
+# Unlike build-examples vax's kit, which holds MACRO-32 that poc wrote on
+# Unix, this one is for changing the programs and building them again.
+# The kit unpacks only the files that are not there already, so it can be
+# run again in the same directory without losing anyone's changes, and
+# BUILD.COM builds only the programs whose .EXE is missing or older than
+# their source; @BUILD ALL builds every one, @BUILD NAME just that one.
+# Each program is built with the options and files the guide gives it,
+# as build-examples vax does: Fail with -trap-location, Shell with
+# ShellCommands.cld.
+set -u
+LC_ALL=C; export LC_ALL
+
+[ $# -eq 2 ] || { echo "usage: build-examples-source <examples dir> <kit>" >&2; exit 2; }
+examples=$(cd "$1" && pwd) || exit 2
+kit=$2
+kitName=$(basename "$kit" | tr a-z A-Z)
+echo "$kitName" | grep -Eq '^[A-Z0-9$_-]{1,39}\.COM$' ||
+  { echo "build-examples-source: the kit's name is not NAME.COM, a VMS name: $kitName" >&2; exit 2; }
+marker='$_POC_EX_EOF' # DECK takes at most 15 characters
+temp=POC_EXAMPLES_KIT.TMP # each file is unpacked as this, then renamed
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/build-examples-source.XXXXXX") || exit 2
+trap 'rm -rf "$work"' EXIT
+cp "$examples"/vax/*/*.Mod "$examples"/vax/*/*.cld "$examples"/coroutines/Queens.Mod \
+  "$examples"/coroutines/WordSets.Mod "$examples"/coroutines/*.txt "$work/" || exit 2
+
+# BUILD.COM: a line calling PROGRAM for each program, which builds it when
+# asked to or when it is out of date
+{
+  cat <<'EOF'
+$ ! BUILD.COM: builds the VAX/VMS Guide's example programs, each NAME.EXE,
+$ ! in the current directory, from their Oberon-2 source with the installed
+$ ! poc (tools/build-examples-source).
+$ !
+$ !   @BUILD         builds each program whose .EXE is missing or older
+$ !                  than its source
+$ !   @BUILD ALL     builds every program
+$ !   @BUILD NAME    builds that program
+$ !
+$ ! Every program is tried; the status is an error when any failed.
+$ IF F$TYPE(POC) .EQS. ""
+$ THEN
+$   WRITE SYS$ERROR "POC is not defined: define the foreign command for the installed poc"
+$   EXIT %X10000014
+$ ENDIF
+$ WHICH = F$EDIT(P1, "TRIM,UPCASE")
+$ BUILD_FOUND == 0
+$ BUILD_BUILT == 0
+$ BUILD_FAILED == 0
+$ GOTO START
+$ !
+$ ! PROGRAM name options file: builds NAME.EXE, compiling NAME.MOD and
+$ ! FILE with OPTIONS, then running the NAME.COM poc writes, which links it
+$PROGRAM: SUBROUTINE
+$ SET NOON
+$ NAME = P1
+$ IF WHICH .NES. "" .AND. WHICH .NES. "ALL" .AND. WHICH .NES. NAME THEN EXIT 1
+$ BUILD_FOUND == BUILD_FOUND + 1
+$ IF F$SEARCH(NAME + ".MOD") .EQS. ""
+$ THEN
+$   WRITE SYS$ERROR "''NAME': ''NAME'.MOD is missing"
+$   BUILD_FAILED == BUILD_FAILED + 1
+$   EXIT 1
+$ ENDIF
+$ STALE = WHICH .NES. ""
+$ IF .NOT. STALE THEN STALE = F$SEARCH(NAME + ".EXE") .EQS. ""
+$ IF .NOT. STALE THEN -
+    EXE = F$CVTIME(F$FILE_ATTRIBUTES(NAME + ".EXE", "RDT"), "COMPARISON")
+$ IF .NOT. STALE THEN -
+    STALE = F$CVTIME(F$FILE_ATTRIBUTES(NAME + ".MOD", "RDT"), "COMPARISON") .GTS. EXE
+$ IF .NOT. STALE .AND. P3 .NES. "" THEN -
+    STALE = F$CVTIME(F$FILE_ATTRIBUTES(P3, "RDT"), "COMPARISON") .GTS. EXE
+$ IF .NOT. STALE THEN EXIT 1
+$ WRITE SYS$OUTPUT "building ''NAME'"
+$ POC 'P2' 'NAME'.MOD 'P3'
+$ IF $STATUS THEN @'NAME'
+$ IF $STATUS
+$ THEN
+$   BUILD_BUILT == BUILD_BUILT + 1
+$ ELSE
+$   WRITE SYS$ERROR "''NAME' failed to build"
+$   BUILD_FAILED == BUILD_FAILED + 1
+$ ENDIF
+$ EXIT 1
+$ ENDSUBROUTINE
+$ !
+$START:
+EOF
+  for path in "$work"/*.Mod; do
+    program=$(basename "$path" .Mod | tr a-z A-Z)
+    options= file=
+    [ $program = SHELL ] && file=SHELLCOMMANDS.CLD
+    [ $program = FAIL ] && options=-TRAP-LOCATION
+    echo "\$ CALL PROGRAM $program \"$options\" \"$file\""
+  done
+  cat <<'EOF'
+$ STATUS = 1
+$ IF BUILD_FOUND .EQ. 0
+$ THEN
+$   WRITE SYS$ERROR "no example program is named ''WHICH'"
+$   STATUS = %X10000014
+$ ELSE
+$   IF BUILD_FAILED .GT. 0 THEN STATUS = %X10000014
+$   WRITE SYS$OUTPUT "built ''BUILD_BUILT', failed ''BUILD_FAILED'; " + -
+      "the others were up to date"
+$ ENDIF
+$ DELETE/SYMBOL/GLOBAL BUILD_FOUND
+$ DELETE/SYMBOL/GLOBAL BUILD_BUILT
+$ DELETE/SYMBOL/GLOBAL BUILD_FAILED
+$ EXIT STATUS
+EOF
+} >"$work/BUILD.COM"
+
+# every name a VMS one, no line beginning with the marker, none longer
+# than 255, as build-examples vax's kit
+files=$(cd "$work" && { echo BUILD.COM; ls | grep -v '^BUILD\.COM$' | LC_ALL=C sort; })
+bad=$(echo "$files" | tr a-z A-Z | grep -Ev '^[A-Z0-9$_-]{1,39}\.[A-Z0-9$_-]{0,39}$' || true)
+[ -z "$bad" ] || { echo "build-examples-source: not a VMS file name: $bad" >&2; exit 1; }
+dup=$(echo "$files" | tr a-z A-Z | sort | uniq -d)
+[ -z "$dup" ] || { echo "build-examples-source: two files named $dup on VMS" >&2; exit 1; }
+for f in $files; do
+  if grep -q "^ *\\$marker" "$work/$f" || awk 'length > 255 { found = 1 } END { exit !found }' "$work/$f"; then
+    echo "build-examples-source: $f cannot go in the kit (a line too long or beginning $marker)" >&2
+    exit 1
+  fi
+done
+
+# the kit: each file is "$ CREATE <temp>", "$ DECK/DOLLARS=<marker>", its
+# lines and the marker, then the temp file renamed to the file's name, or
+# deleted when that file is there already, which keeps any change made to
+# it; BUILD.COM, which is the kit's, is always written anew. No GOTO or
+# label follows the first file, so DCL never searches through the data.
+{
+  cat <<EOF
+\$ ! $kitName:
+\$ ! the VAX/VMS Guide's example programs as Oberon-2 source, in a kit
+\$ ! that unpacks itself (tools/build-examples-source). Copied to VMS in
+\$ ! ASCII mode, it is run in a directory of its own, then BUILD.COM,
+\$ ! which compiles and links every program there with the installed poc,
+\$ ! the foreign command POC:
+\$ !
+\$ !   \$ @${kitName%.COM}
+\$ !   \$ @BUILD
+\$ !
+\$ ! Run again, it
+\$ ! unpacks only the files that are missing, so changes are kept; @BUILD
+\$ ! then builds only the programs whose source is newer than their .EXE.
+EOF
+  cat <<EOF
+\$ ON WARNING THEN EXIT \$STATUS
+\$ IF F\$SEARCH("$temp") .NES. "" THEN DELETE/NOLOG $temp;*
+\$ WRITE SYS\$OUTPUT "unpacking the VAX/VMS Guide's examples"
+\$ KEPT = 0
+EOF
+  for f in $files; do
+    F=$(echo "$f" | tr a-z A-Z)
+    if [ "$F" = BUILD.COM ]; then
+      echo "\$ CREATE BUILD.COM"
+    else
+      echo "\$ CREATE $temp"
+    fi
+    echo "\$ DECK/DOLLARS=\"$marker\""
+    awk '{ print }' "$work/$f"
+    echo "$marker"
+    if [ "$F" != BUILD.COM ]; then
+      echo "\$ HAVE = F\$SEARCH(\"$F\") .NES. \"\""
+      echo "\$ IF .NOT. HAVE THEN RENAME/NOLOG $temp;0 $F;1"
+      echo "\$ IF HAVE THEN DELETE/NOLOG $temp;*"
+      echo "\$ IF HAVE THEN WRITE SYS\$OUTPUT \"kept $F, which was here\""
+      echo "\$ IF HAVE THEN KEPT = KEPT + 1"
+    fi
+  done
+  cat <<'EOF'
+$ IF KEPT .GT. 0 THEN WRITE SYS$OUTPUT "kept ''KEPT' files; delete one to have the kit's"
+$ WRITE SYS$OUTPUT "unpacked; now @BUILD"
+$ EXIT 1
+EOF
+} >"$kit"
+echo "kit: $kit"

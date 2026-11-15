@@ -74,23 +74,32 @@ CATEGORIZED_TESTS := $(LEXER_TESTS) $(PARSER_TESTS) $(SEMANTIC_TESTS) $(MODULE_T
 # targetable by a single part of the compiler.
 MISC_TESTS := $(filter-out $(CATEGORIZED_TESTS),$(ALL_TESTS))
 
-.PHONY: FORCE all build installable install uninstall check-install installable-vax install-vax uninstall-vax check-install-vax check-install-vax-run seed check-seed doc doc-html doc-pdf doc-all doc-other-html doc-other-pdf dist dist-sign distcheck set-version check-hosts release-files stage1 stage2 test-stage1 check check-stage1 check-strict check-o2 check-opt2 check-lto test test-vax test-vax-asts test-vax-guest-poc vax-v1 vax-stages vax-kit check-vax-kit vax-image examples examples-vax test-lexer test-parser test-semantic test-modules test-layout test-llvm test-misc clean clean-build clean-tests
+.PHONY: FORCE all build installable install uninstall check-install installable-vax install-vax uninstall-vax check-install-vax check-install-vax-run seed check-seed doc doc-html doc-pdf doc-all doc-other-html doc-other-pdf dist dist-sign distcheck set-version check-hosts release-files stage1 stage2 test-stage1 check check-stage1 check-strict check-o2 check-opt2 check-lto test test-vax test-vax-asts test-vax-guest-poc vax-v1 vax-stages vax-kit check-vax-kit vax-image examples examples-vax examples-vax-source test-lexer test-parser test-semantic test-modules test-layout test-llvm test-misc clean clean-build clean-tests
 
 build: $(BIN) $(call RTL_LIBRARIES,$(BUILD_DIR))
 
 # The guides' example programs, built with build/bin/poc where they can be
 # tried (tools/build-examples): each directory of doc/examples in its own
-# under build/examples, and the VAX/VMS Guide's programs, from rtl/vax's
+# under build/examples, and the VAX/VMS Guide's programs, with the User's
+# Guide's Queens and WordSets, which run on VMS unchanged, from rtl/vax's
 # source, all in build/examples-vax with a BUILD.COM that builds them all
 # on VMS, and the lot as a kit that unpacks itself,
 # build/POC-EXAMPLES-<version>.COM (make dist writes it too), to be copied to VMS and run in an empty directory, then @BUILD. Neither is part of make check: doc-users-guide and
-# doc-vax-guide build and run the same programs.
+# doc-vax-guide build and run the same programs. examples-vax-source
+# writes the same programs' Oberon-2 source as a kit for a VMS system
+# with poc installed, build/POC-EXAMPLES-SOURCE-<version>.COM
+# (tools/build-examples-source; make dist writes it too), whose BUILD.COM
+# compiles each program there with POC and builds it again when its
+# source changes.
 examples: build
 	$(STAGE0_ENV) tools/build-examples unix $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples
 
 examples-vax: $(BIN)
 	$(STAGE0_ENV) tools/build-examples vax $(abspath $(BIN)) doc/examples $(BUILD_DIR)/examples-vax rtl/vax \
 	  $(BUILD_DIR)/$(EXAMPLES_KIT_NAME)
+
+examples-vax-source:
+	tools/build-examples-source doc/examples $(BUILD_DIR)/$(EXAMPLES_SOURCE_KIT_NAME)
 
 $(BIN): $(SRCS) $(STAGE0_RTL_SRCS) tools/bootstrap/voc-heap-gc-spill.c $(BUILD_INFO)
 	tools/bootstrap/stage0
@@ -521,8 +530,9 @@ $(DOC_OTHER_DIR)/pdf/%.pdf: doc/%.md tools/doc/pdf.lua tools/doc/pdf-header.tex
 # products or test outputs), the bootstrap seed as seed/, the two kits of
 # poc for VAX/VMS as vax/POC-<version>.COM and vax/POC-VMS-<version>.COM
 # (Phase 17 step 7), which are also written beside the tarball, the
-# VAX/VMS Guide's examples as a kit, POC-EXAMPLES-<version>.COM, beside it
-# too (make examples-vax), the
+# VAX/VMS Guide's examples as two kits beside it too,
+# POC-EXAMPLES-<version>.COM (make examples-vax) and their source,
+# POC-EXAMPLES-SOURCE-<version>.COM (make examples-vax-source), the
 # documents as
 # HTML and PDF in doc/html and doc/pdf (make doc), and COMMIT, the
 # commit, which tools/build-info reads where there is no .git. Refused
@@ -543,6 +553,10 @@ VAX_KIT_NAMES := POC-$(subst .,-,$(VERSION)).COM POC-VMS-$(subst .,-,$(VERSION))
 # the VAX/VMS Guide's examples as a kit (make examples-vax), a release's
 # file too, which make dist writes beside the tarball with the Stage 2 poc
 EXAMPLES_KIT_NAME := POC-EXAMPLES-$(subst .,-,$(VERSION)).COM
+# the same programs' source as a kit to build on VMS with an installed poc
+# (make examples-vax-source), a release's file too, which make dist writes
+# beside the tarball
+EXAMPLES_SOURCE_KIT_NAME := POC-EXAMPLES-SOURCE-$(subst .,-,$(VERSION)).COM
 
 dist: $(STAGE2_BIN) doc
 	@git diff --quiet HEAD -- || { echo "dist: the tracked files differ from HEAD; commit first"; exit 1; }
@@ -565,6 +579,7 @@ dist: $(STAGE2_BIN) doc
 	rm -rf $(DIST_DIR)/vax-kit
 	tools/build-examples vax $(abspath $(STAGE2_BIN)) doc/examples $(DIST_DIR)/examples-vax rtl/vax \
 	  $(DIST_DIR)/$(EXAMPLES_KIT_NAME) >/dev/null
+	tools/build-examples-source doc/examples $(DIST_DIR)/$(EXAMPLES_SOURCE_KIT_NAME) >/dev/null
 	rm -rf $(DIST_DIR)/examples-vax
 	cd $(DIST_DIR) && tar -cf - $(DIST_NAME) | gzip -9 > $(DIST_NAME).tar.gz
 	cd $(DIST_DIR) && if command -v sha256sum >/dev/null; then sha256sum $(DIST_NAME).tar.gz; \

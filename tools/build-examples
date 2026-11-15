@@ -13,7 +13,10 @@
 # they are run, as the guide says.
 #
 # vax builds every program under doc/examples/vax for VAX/VMS from
-# rtl/vax's source, as doc-vax-guide does, all into the one output
+# rtl/vax's source, as doc-vax-guide does, and the User's Guide's two
+# coroutine programs, Queens and WordSets, which the VAX/VMS Guide names
+# and which run there unchanged (vax-coroutines-examples), with WordSets'
+# two files, all into the one output
 # directory, which holds, besides each program's MACRO-32 and build
 # procedure, PocRtl.mar, CoroutineSwitch.mar and BUILD.COM, which
 # assembles those two and runs every program's procedure. It also writes
@@ -78,14 +81,16 @@ if [ $mode = unix ]; then
   done
 else
   rtl=$(cd "$5" && pwd) || exit 2
-  cp "$examples"/vax/*/*.Mod "$examples"/vax/*/*.cld "$rtl/PocRtl.mar" "$rtl/CoroutineSwitch.mar" "$out/"
-  for path in "$examples"/vax/*/*.Mod; do
+  coroutines="$examples/coroutines/Queens.Mod $examples/coroutines/WordSets.Mod"
+  cp "$examples"/vax/*/*.Mod "$examples"/vax/*/*.cld $coroutines "$examples"/coroutines/*.txt \
+    "$rtl/PocRtl.mar" "$rtl/CoroutineSwitch.mar" "$out/"
+  for path in "$examples"/vax/*/*.Mod $coroutines; do
     program=$(basename "$path" .Mod)
     echo "$program"
     extra= flags=
     [ $program = Shell ] && extra=ShellCommands.cld
     [ $program = Fail ] && flags=-trap-location
-    [ $program = TaskMailbox ] && flags="-link COROUTINESWITCH.OBJ"
+    case $program in TaskMailbox|Queens|WordSets) flags="-link COROUTINESWITCH.OBJ" ;; esac
     run "$out" "$program" "$poc" -target vax-dec-vms $flags -import-path "$rtl" \
       -import-path "$rtl/vms" -import-path "$rtl/vmslib" -build $program.Mod $extra
   done
