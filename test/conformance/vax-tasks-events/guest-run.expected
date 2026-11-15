@@ -1,0 +1,7 @@
+build status: %X10000001
+A: ticker, a mailbox a subprocess writes, AST signals
+  ticks 100 of 100; mailbox lines 50 of 50, ends 1
+  signals caught 200, wakes 200 of 200, lost 0
+B: AST signals alone
+  signals caught 500, wakes 500 of 500, lost 0
+run status: %X00000001

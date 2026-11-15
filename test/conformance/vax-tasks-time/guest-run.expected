@@ -1,0 +1,17 @@
+build status: %X10000001
+slept at least 100 ms
+slept at least 200 ms
+slept at least 300 ms
+slept at least 500 ms
+the spinner saw the waker
+a1 b1 a2 b2 a3 b3 
+main slept at least 150 ms
+Select: 1, NIL, at least 300 ms
+After sent once
+After(0) at once
+After(-5) in Select: 1
+a closed After got nothing
+slept at least 200 ms
+awaited 20 posts, ASTs 20
+done
+run status: %X00000001

@@ -31,10 +31,11 @@ sh $root/tools/guide-examples check $guide $root/doc/examples work/listings >>re
 echo "listings exit $?" >>result
 mkdir -p work/build
 cp $root/doc/examples/vax/*/*.Mod $root/doc/examples/vax/*/*.cld work/build/
-for program in Hello Versions WhereLogin WhereLogin2 Dates Factorial Words SystemInfo Greet Shell Warnings Probe Goodbye Ticks Mailbox Spawn Fail Fault Parts Panel; do
+for program in Hello Versions WhereLogin WhereLogin2 Dates Factorial Words SystemInfo Greet Shell Warnings Probe Goodbye Ticks Mailbox TaskMailbox Spawn Fail Fault Parts Panel; do
   extra= flags=
   [ $program = Shell ] && extra=ShellCommands.cld
   [ $program = Fail ] && flags=-trap-location
+  [ $program = TaskMailbox ] && flags="-link COROUTINESWITCH.OBJ"
   (cd work/build && poc -target vax-dec-vms $flags -import-path ../../$rtl -import-path ../../$rtl/vms \
     -import-path ../../$rtl/vmslib -build $program.Mod $extra) >>result 2>&1
   echo "VAX build $program exit $?" >>result
@@ -66,6 +67,6 @@ awk '
 vax_mask=yes
 vax_do guest-run.com work/sessions.expected work/build/*.mar work/build/*.com work/build/*.cld \
   work/objects/*.obj work/objects/FaultO.com work/FaultG.com work/FaultG.obj \
-  work/build/Fault.Mod work/build/Fault.dbg $rtl/PocRtl.mar
+  work/build/Fault.Mod work/build/Fault.dbg $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
 rm -rf work
 . ../../testresult.sh

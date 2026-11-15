@@ -331,7 +331,8 @@ writes `:= ..`). `-strict` rejects it.
 
 ### What traps, and what does not (Phase 11 C9)
 
-The tables of trap statuses 2-18 (15 VAX/VMS only, 16-18 `Coroutines`'),
+The tables of trap statuses 2-20 (15 VAX/VMS only, 16-18 `Coroutines`', 19-20
+`Tasks`'),
 what ends a program silently, what nothing stops, and what is a
 compile-time error. `poc -trap-location` (C7) prefixes every trap message
 with `file:line:column:` and ends it with the procedure, "(in List.Insert)". Since Phase 12 step 1 (2026-09-27) a function that reaches
@@ -488,6 +489,26 @@ finalizer, a signal handler or an AST) and 18 (no memory for a stack,
 always); none has a `-trap-location`. A blocking call stops them all;
 switching out of a C callback is allowed only if it is resumed and returns
 first; nothing may unwind across a switch.
+
+### Tasks (decided 2026-11-14; Phase 19, candidate 7)
+
+A runtime module over `Coroutines`, the same Oberon on both back ends,
+implemented (`doc/developer/tasks.md`; the User's Guide's chapter 12;
+probes in `concurrency-survey.md` section 10). A task is a `TaskDesc` extension with an
+exported `Run`; nothing preempts; the program ends with the main body,
+abandoning tasks. Mesa conditions, mutexes, channels of extensible records,
+a receive-only `Select`, `After` as a timeout channel. `Post` only sets
+flags, for signal handlers and ASTs; the idle wait is `poll` and a
+self-pipe on POSIX, `$HIBER`/`$WAKE` and its own `$SETIMR` on VMS (never
+`$CANWAK`), replaceable by `SetIdleStep` (which must watch
+`WakeDescriptor()`). `Sleep` waits at least its time. `AwaitReadable`
+and `AwaitWritable` are POSIX's (VMS: trap 20; a `$QIO`'s AST posts
+instead). `TaskInput`'s `Char`/`Line` read standard input as a task
+(never mixed with `In`); on a VMS terminal Out's and Err's lines break
+through its pending read (`IO$M_BREAKTHRU`), and a disk file's RMS read
+still stops every task. Traps 19 (all blocked, no timer, descriptor or `Await`) and 20
+(misuse); on VMS no AST-level check (its cost), so a
+blocking call in an AST is undefined.
 
 ## Project state
 

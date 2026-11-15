@@ -1,0 +1,21 @@
+A: ticker, slow pipe, signals
+  ticks 100 of 100; bytes 250 of 250, ends 1
+  signals caught 1000, wakes 1000 of 1000
+B: signals alone
+  signals caught 1000, wakes 1000 of 1000
+C: a ready pipe beside a task that only yields
+  the reader ran while a task yielded
+D: AwaitWritable of an empty pipe, AwaitReadable after a write
+  bytes 1
+exit=0
+== -OC
+A: ticker, slow pipe, signals
+  ticks 100 of 100; bytes 250 of 250, ends 1
+  signals caught 1000, wakes 1000 of 1000
+B: signals alone
+  signals caught 1000, wakes 1000 of 1000
+C: a ready pipe beside a task that only yields
+  the reader ran while a task yielded
+D: AwaitWritable of an empty pipe, AwaitReadable after a write
+  bytes 1
+exit=0

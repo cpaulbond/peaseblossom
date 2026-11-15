@@ -50,21 +50,26 @@
 ; 9; LLVMCodeGenerator's trap messages), and CHR's for 14 when the code's
 ; high word is 1 and VAL's when it is 2, SHORT's being the other; and
 ; 15, the VAX's alone, GarbageCollectedHeap's when an AST re-enters it
-; (section 22.7); and Coroutines' 16 to 18, 17's case n + 1 in the high
-; word (doc/developer/coroutines.md, decision 9). Slots 16 to 18 are the
-; codes', 17's case 0 in 17; 19 and 20 CHR's and VAL's; 21 to 25 17's
-; cases 1 to 5
-; the table in POC_ADDR, the constants that hold addresses, so that
-; POC_CONST stays shareable in a shareable image (section 18, proposal 5)
+; (section 22.7); Coroutines' 16 to 18, 17's case n + 1 in the high
+; word (doc/developer/coroutines.md, decision 9); and Tasks' 19 and 20,
+; 20's case n in the high word (doc/developer/tasks.md, decision 6).
+; Slots 16 to 20 are the codes', 17's and 20's case 0 in 17 and 20; 21
+; and 22 CHR's and VAL's; 23 to 27 17's cases 1 to 5; 28 to 34 20's
+; cases 1 to 7. The table is in POC_ADDR, the constants that hold
+; addresses, so that POC_CONST stays shareable in a shareable image
+; (section 18, proposal 5). A text with a "/" is delimited by quotes.
 	.PSECT	POC_ADDR
 POC_TRAP_TEXTS:
 	.ADDRESS	POC_TX_0, POC_TX_0, POC_TX_2, POC_TX_3, POC_TX_4
 	.ADDRESS	POC_TX_5, POC_TX_6, POC_TX_7, POC_TX_8, POC_TX_9
 	.ADDRESS	POC_TX_10, POC_TX_11, POC_TX_12, POC_TX_13, POC_TX_14
 	.ADDRESS	POC_TX_15, POC_TX_16, POC_TX_17, POC_TX_18
+	.ADDRESS	POC_TX_19, POC_TX_20
 	.ADDRESS	POC_TX_CHR, POC_TX_VAL
 	.ADDRESS	POC_TX_17_1, POC_TX_17_2, POC_TX_17_3, POC_TX_17_4
 	.ADDRESS	POC_TX_17_5
+	.ADDRESS	POC_TX_20_1, POC_TX_20_2, POC_TX_20_3, POC_TX_20_4
+	.ADDRESS	POC_TX_20_5, POC_TX_20_6, POC_TX_20_7
 	.PSECT	POC_CONST
 POC_TX_0:	.ASCIC	/trap/
 POC_TX_2:	.ASCIC	/index out of range/
@@ -89,6 +94,15 @@ POC_TX_17_3:	.ASCIC	/Free of the main program's coroutine/
 POC_TX_17_4:	.ASCIC	/Transfer in a finalizer/
 POC_TX_17_5:	.ASCIC	/Transfer at AST level/
 POC_TX_18:	.ASCIC	/no memory for a coroutine's stack/
+POC_TX_19:	.ASCIC	/all tasks are blocked/
+POC_TX_20:	.ASCIC	/Unlock of a mutex the running task does not hold/
+POC_TX_20_1:	.ASCIC	/Join of the running task/
+POC_TX_20_2:	.ASCIC	/Send on a closed channel/
+POC_TX_20_3:	.ASCIC	/Close of a channel already closed/
+POC_TX_20_4:	.ASCIC	/Start of a task already started/
+POC_TX_20_5:	.ASCIC	/NewChannel with a negative capacity/
+POC_TX_20_6:	.ASCIC	/AwaitReadable or AwaitWritable of a negative descriptor/
+POC_TX_20_7:	.ASCIC	"AwaitReadable or AwaitWritable on VAX/VMS"
 POC_TX_CHR:	.ASCIC	/CHR argument out of range/
 POC_TX_VAL:	.ASCIC	/VAL argument out of range/
 ; -trap-location's form: file:line:column: message (in procedure)
@@ -133,32 +147,44 @@ POC_ASSERT_OUT:
 ; and procedure counted strings, the code in the low word of its
 ; longword and which of its messages in the high word (1 for 14, CHR's,
 ; 2 VAL's; n + 1 for 10, ASSERT(x, n)'s "assertion failed (n)"; n for 17,
-; Coroutines' case n, 1 to 5): the message
+; Coroutines' case n, 1 to 5; n for 20, Tasks' case n, 1 to 7): the message
 ; written to SYS$ERROR, as the LLVM backend writes it to the standard
 ; error, then the program ends with %X10000000 + 8 * code + 2, severity
 ; error, message number code, with STS$M_INHIB_MSG set so that DCL adds
 ; nothing. Under -trap-location the call has six arguments, and the
 ; message is prefixed with file:line:column: and ended with (in
 ; procedure), as on LLVM. A record that cannot be written is let go: the
-; status still says what happened
+; status still says what happened. A TaskInput read pending on the
+; terminal is cancelled first, so that the message is not held until the
+; user ends the line (doc/developer/tasks.md, Phase 11, proposal 4)
 	.ENTRY	POC_TRAP, ^M<R2,R3,R4,R5>
-	MOVZWL	4(AP), R2
+	TSTL	POC_READ_CHANNEL
+	BEQL	1$
+	$CANCEL_S	CHAN=POC_READ_CHANNEL
+	CLRL	POC_READ_CHANNEL
+1$:	MOVZWL	4(AP), R2
 	MOVL	R2, R3
-	CMPL	R3, #18
+	CMPL	R3, #20
 	BGTRU	5$
 	CMPL	R3, #14
 	BEQL	3$
-	CMPL	R3, #17
-	BNEQ	10$
 	MOVZWL	6(AP), R0
 	BEQL	10$
+	CMPL	R3, #17
+	BNEQ	2$
 	CMPL	R0, #5
 	BGTRU	10$
-	ADDL3	#20, R0, R3
+	ADDL3	#22, R0, R3
+	BRB	10$
+2$:	CMPL	R3, #20
+	BNEQ	10$
+	CMPL	R0, #7
+	BGTRU	10$
+	ADDL3	#27, R0, R3
 	BRB	10$
 3$:	MOVZWL	6(AP), R0
 	BEQL	10$
-	ADDL3	#18, R0, R3
+	ADDL3	#20, R0, R3
 	BRB	10$
 5$:	CLRL	R3
 10$:	MOVL	POC_TRAP_TEXTS[R3], R3
@@ -646,10 +672,14 @@ POC_LINES_EXIT_STATUS:
 ; descriptor made on the stack; R0 LIB$PUT_OUTPUT's status. But while
 ; POC_FLUSH_OUTPUT has left the terminal's line open, they are written to
 ; the terminal as they are, then a carriage return, which ends the line as
-; a record ends (design section 19.17, proposal 2); R0 1
+; a record ends (design section 19.17, proposal 2); R0 1. And while a
+; TaskInput read is pending on the terminal, the record is written to it
+; by POC_TERMINAL_QIOW, breaking through the read, with the line feed
+; before it and the carriage return after it that a record has
+; (doc/developer/tasks.md, Phase 11, proposal 4); R0 the status
 	.ENTRY	POC_PUT_LINE, ^M<>
 	TSTL	POC_OPEN_LINE
-	BEQL	10$
+	BEQL	8$
 	CLRL	POC_OPEN_LINE
 	MOVZWL	8(AP), R0
 	BEQL	5$
@@ -660,6 +690,16 @@ POC_LINES_EXIT_STATUS:
 	PUSHAB	POC_CR
 	CALLS	#2, POC_TERMINAL_WRITE
 	MOVL	#1, R0
+	RET
+8$:	TSTL	POC_READ_CHANNEL
+	BEQL	10$
+	CMPL	POC_OUT_TERMINAL, #1
+	BNEQ	10$
+	PUSHL	#POC_RECORD_CONTROL
+	MOVZWL	8(AP), -(SP)
+	PUSHL	4(AP)
+	PUSHL	POC_OUT_CHANNEL
+	CALLS	#4, POC_TERMINAL_QIOW
 	RET
 10$:	SUBL2	#8, SP
 	MOVW	8(AP), (SP)
@@ -672,9 +712,25 @@ POC_LINES_EXIT_STATUS:
 	RET
 
 ; POC_PUT_ERROR_LINE(text, length): the same written to SYS$ERROR, by
-; RMS as POC_TRAP writes; R0 the status
+; RMS as POC_TRAP writes; R0 the status. While a TaskInput read is
+; pending on the terminal, and SYS$ERROR is a terminal, it is written as
+; POC_PUT_LINE writes then, on a channel of its own, POC_ERR_CHANNEL
 	.ENTRY	POC_PUT_ERROR_LINE, ^M<>
-	CALLS	#0, POC_ERR_OPEN
+	TSTL	POC_READ_CHANNEL
+	BEQL	5$
+	PUSHAL	POC_ERR_CHANNEL
+	PUSHAL	POC_ERR_TERMINAL
+	PUSHL	#9
+	PUSHAB	POC_ERR_NAME
+	CALLS	#4, POC_TERMINAL_CHANNEL
+	BLBC	R0, 5$
+	PUSHL	#POC_RECORD_CONTROL
+	MOVZWL	8(AP), -(SP)
+	PUSHL	4(AP)
+	PUSHL	POC_ERR_CHANNEL
+	CALLS	#4, POC_TERMINAL_QIOW
+	RET
+5$:	CALLS	#0, POC_ERR_OPEN
 	BLBC	R0, 10$
 	MOVW	8(AP), POC_ERR_RAB+RAB$W_RSZ
 	MOVL	4(AP), POC_ERR_RAB+RAB$L_RBF
@@ -716,6 +772,12 @@ POC_OUT_NAME:
 	.ASCII	/SYS$OUTPUT/
 POC_LF:	.BYTE	10
 POC_CR:	.BYTE	13
+POC_ERR_NAME:
+	.ASCII	/SYS$ERROR/
+; a terminal write's carriage control for a record, as RMS gives one:
+; prefix a line feed, postfix a carriage return (I/O manual, part 1,
+; 8.4.2.2, table 8-11)
+POC_RECORD_CONTROL = ^X8D8A0000
 
 	.PSECT	POC_DATA
 ; whether SYS$OUTPUT is a terminal: 0 not yet known, 1 a terminal, on
@@ -724,6 +786,19 @@ POC_OUT_TERMINAL:
 	.BLKL	1
 POC_OUT_CHANNEL:
 	.BLKL	1
+; the same for SYS$ERROR, found when an Err line is written while a
+; TaskInput read is pending
+POC_ERR_TERMINAL:
+	.BLKL	1
+POC_ERR_CHANNEL:
+	.BLKL	1
+; the channel of a TaskInput read pending on the terminal, from
+; POC_TASK_READ to POC_TASK_READ_DONE; 0 when there is none
+POC_READ_CHANNEL:
+	.BLKL	1
+; the I/O status block of a write to the terminal
+POC_WRITE_IOSB:
+	.BLKQ	1
 ; 1 while part of a line has been written to the terminal and the line
 ; not yet ended
 POC_OPEN_LINE:
@@ -738,28 +813,8 @@ POC_OPEN_LINE:
 ; POC_PUT_LINE, POC_LINES_EXIT or POC_INPUT_GET ends it. Anything but a
 ; terminal is left alone, and Out's line with it. R0 1
 	.ENTRY	POC_FLUSH_OUTPUT, ^M<R2>
-	TSTL	POC_OUT_TERMINAL
-	BNEQ	10$
-	MOVL	#2, POC_OUT_TERMINAL
-	PUSHL	#10
-	PUSHAB	POC_OUT_NAME
-	CALLS	#2, POC_IS_TERMINAL
-	BLBC	R0, 10$
-	SUBL2	#8, SP
-	MOVW	#10, DSC$W_LENGTH(SP)
-	MOVB	#DSC$K_DTYPE_T, DSC$B_DTYPE(SP)
-	MOVB	#DSC$K_CLASS_S, DSC$B_CLASS(SP)
-	MOVAB	POC_OUT_NAME, DSC$A_POINTER(SP)
-	MOVL	SP, R0
-	CLRQ	-(SP)
-	PUSHAL	POC_OUT_CHANNEL
-	PUSHL	R0
-	CALLS	#4, G^SYS$ASSIGN
-	ADDL2	#8, SP
-	BLBC	R0, 10$
-	MOVL	#1, POC_OUT_TERMINAL
-10$:	CMPL	POC_OUT_TERMINAL, #1
-	BNEQ	90$
+	CALLS	#0, POC_OUT_IS_TERMINAL
+	BLBC	R0, 90$
 	MOVL	POC_LINES+4, R2
 	BEQL	90$
 	TSTL	(R2)
@@ -778,19 +833,83 @@ POC_OPEN_LINE:
 	RET
 
 ; POC_TERMINAL_WRITE(text, length): the length bytes at text written to
-; the terminal on POC_OUT_CHANNEL with no carriage control ($QIOW,
-; IO$_WRITEVBLK, P4 0); R0 the status
+; the terminal on POC_OUT_CHANNEL with no carriage control; R0 the status
 	.ENTRY	POC_TERMINAL_WRITE, ^M<>
-	CLRQ	-(SP)
-	CLRQ	-(SP)
-	PUSHL	8(AP)
-	PUSHL	4(AP)
-	CLRQ	-(SP)
 	CLRL	-(SP)
-	PUSHL	#IO$_WRITEVBLK
+	MOVQ	4(AP), -(SP)
 	PUSHL	POC_OUT_CHANNEL
+	CALLS	#4, POC_TERMINAL_QIOW
+	RET
+
+; POC_TERMINAL_QIOW(channel, text, length, control): the length bytes at
+; text written to the terminal on channel with the carriage control
+; control ($QIOW, IO$_WRITEVBLK, P4 control: I/O manual, part 1,
+; 8.4.2.2), and while a TaskInput read is pending, IO$M_BREAKTHRU and
+; IO$M_REFRESH, so that the write goes out at once and the read's prompt
+; and what has been typed are written again after it (8.4.2, and
+; doc/research/concurrency-survey.md, 10.6); R0 the status. The I/O
+; status block makes $QIOW wait for this write, not for the event flag
+; a read's completion may set as well
+	.ENTRY	POC_TERMINAL_QIOW, ^M<>
+	MOVL	#IO$_WRITEVBLK, R0
+	TSTL	POC_READ_CHANNEL
+	BEQL	10$
+	BISL2	#<IO$M_BREAKTHRU!IO$M_REFRESH>, R0
+10$:	CLRQ	-(SP)
+	PUSHL	16(AP)
+	CLRL	-(SP)
+	PUSHL	12(AP)
+	PUSHL	8(AP)
+	CLRQ	-(SP)
+	PUSHAQ	POC_WRITE_IOSB
+	PUSHL	R0
+	PUSHL	4(AP)
 	CLRL	-(SP)
 	CALLS	#12, G^SYS$QIOW
+	BLBC	R0, 20$
+	MOVZWL	POC_WRITE_IOSB, R0
+20$:	RET
+
+; POC_TERMINAL_CHANNEL(name, length, state, channel): R0 1 when the
+; device name is on is a terminal, else 0, found the first time and kept
+; in the longword state: 0 not known yet, 1 a terminal, $ASSIGNed to
+; the word channel, 2 not (or it could not be assigned)
+	.ENTRY	POC_TERMINAL_CHANNEL, ^M<R2>
+	MOVL	12(AP), R2
+	TSTL	(R2)
+	BNEQ	10$
+	MOVL	#2, (R2)
+	PUSHL	8(AP)
+	PUSHL	4(AP)
+	CALLS	#2, POC_IS_TERMINAL
+	BLBC	R0, 10$
+	SUBL2	#8, SP
+	MOVW	8(AP), DSC$W_LENGTH(SP)
+	MOVB	#DSC$K_DTYPE_T, DSC$B_DTYPE(SP)
+	MOVB	#DSC$K_CLASS_S, DSC$B_CLASS(SP)
+	MOVL	4(AP), DSC$A_POINTER(SP)
+	MOVL	SP, R0
+	CLRQ	-(SP)
+	PUSHL	16(AP)
+	PUSHL	R0
+	CALLS	#4, G^SYS$ASSIGN
+	ADDL2	#8, SP
+	BLBC	R0, 10$
+	MOVL	#1, (R2)
+10$:	CLRL	R0
+	CMPL	(R2), #1
+	BNEQ	20$
+	MOVL	#1, R0
+20$:	RET
+
+; POC_OUT_IS_TERMINAL: POC_TERMINAL_CHANNEL for SYS$OUTPUT, on
+; POC_OUT_CHANNEL
+	.ENTRY	POC_OUT_IS_TERMINAL, ^M<>
+	PUSHAL	POC_OUT_CHANNEL
+	PUSHAL	POC_OUT_TERMINAL
+	PUSHL	#10
+	PUSHAB	POC_OUT_NAME
+	CALLS	#4, POC_TERMINAL_CHANNEL
 	RET
 
 ; Platform's and Modules' services (rtl/vax/Platform.Mod and Modules.Mod;
@@ -1303,49 +1422,100 @@ POC_PROMPT:
 	.BLKB	255
 
 	.PSECT	POC_CODE
-; POC_INPUT_GET(control, record, size): POC_FILE_GET, but if Out's line
-; (POC_LINES) holds 1 to 254 characters, they are $GET's prompt (RMS
-; 7.13, RAB$V_PMT), after a line feed, which starts the line as a record
-; written to the terminal starts, and Out's line is then empty. Platform
-; calls it for SYS$INPUT when it and SYS$OUTPUT are terminals (design
-; section 19.11, proposal 2)
-	.ENTRY	POC_INPUT_GET, ^M<R2,R3,R4,R5,R6>
-	MOVL	4(AP), R6
-	BICL2	#RAB$M_PMT, POC_F_RAB+RAB$L_ROP(R6)
+; POC_TAKE_PROMPT: R0 the length of the prompt for a read of the
+; terminal, made in POC_PROMPT from Out's line (POC_LINES), 0 for none.
+; If Out's line holds 1 to 254 characters, the prompt is a line feed,
+; which starts the line as a record written to the terminal starts, then
+; those characters, and Out's line is then empty. While the terminal's
+; line is open, Out's line, if it holds 1 to 255 characters, is the
+; prompt as it is, with no line feed, else it is written by
+; POC_FLUSH_OUTPUT; either way the read ends the line
+	.ENTRY	POC_TAKE_PROMPT, ^M<R2,R3,R4,R5,R6>
+	CLRL	R6
 	MOVL	POC_LINES+4, R2
-	BEQL	10$
+	BEQL	90$
 	TSTL	POC_OPEN_LINE
 	BNEQ	20$
 	MOVL	(R2), R0
-	BLEQ	10$
+	BLEQ	90$
 	CMPL	R0, #254
-	BGTR	10$
+	BGTR	90$
 	MOVB	#10, POC_PROMPT
 	MOVC3	R0, @POC_LINES, POC_PROMPT+1
 	MOVL	POC_LINES+4, R2
-	ADDB3	#1, (R2), POC_F_RAB+RAB$B_PSZ(R6)
-	MOVAB	POC_PROMPT, POC_F_RAB+RAB$L_PBF(R6)
-	BISL2	#RAB$M_PMT, POC_F_RAB+RAB$L_ROP(R6)
+	ADDL3	#1, (R2), R6
 	CLRL	(R2)
-10$:	CALLG	(AP), POC_FILE_GET
-	RET
-; the terminal's line is open: Out's line, if it holds 1 to 255
-; characters, is the prompt as it is, with no line feed, else it is
-; written by POC_FLUSH_OUTPUT; either way the read ends the line
+	BRB	90$
 20$:	MOVL	(R2), R0
 	BLEQ	40$
 	CMPL	R0, #255
 	BGTR	30$
 	MOVC3	R0, @POC_LINES, POC_PROMPT
 	MOVL	POC_LINES+4, R2
-	MOVB	(R2), POC_F_RAB+RAB$B_PSZ(R6)
-	MOVAB	POC_PROMPT, POC_F_RAB+RAB$L_PBF(R6)
-	BISL2	#RAB$M_PMT, POC_F_RAB+RAB$L_ROP(R6)
+	MOVL	(R2), R6
 	CLRL	(R2)
 	BRB	40$
 30$:	CALLS	#0, POC_FLUSH_OUTPUT
 40$:	CLRL	POC_OPEN_LINE
-	BRB	10$
+90$:	MOVL	R6, R0
+	RET
+
+; POC_INPUT_GET(control, record, size): POC_FILE_GET, with POC_TAKE_PROMPT's
+; prompt, if any, as $GET's (RMS 7.13, RAB$V_PMT). Platform calls it for
+; SYS$INPUT when it and SYS$OUTPUT are terminals (design section 19.11,
+; proposal 2)
+	.ENTRY	POC_INPUT_GET, ^M<R6>
+	MOVL	4(AP), R6
+	BICL2	#RAB$M_PMT, POC_F_RAB+RAB$L_ROP(R6)
+	CALLS	#0, POC_TAKE_PROMPT
+	TSTL	R0
+	BEQL	10$
+	MOVB	R0, POC_F_RAB+RAB$B_PSZ(R6)
+	MOVAB	POC_PROMPT, POC_F_RAB+RAB$L_PBF(R6)
+	BISL2	#RAB$M_PMT, POC_F_RAB+RAB$L_ROP(R6)
+10$:	CALLG	(AP), POC_FILE_GET
+	RET
+
+; POC_TASK_READ(channel, buffer, size, iosb, ast, parameter): TaskInput's
+; read of a record from the terminal on channel, which SYS$INPUT is
+; assigned to (rtl/vax/TaskInput.Mod; doc/developer/tasks.md, Phase 11,
+; proposals 4 and 5): a $QIO of up to size bytes into buffer, whose
+; completion is the AST ast(parameter), IO$_READPROMPT with
+; POC_TAKE_PROMPT's prompt when SYS$OUTPUT is a terminal and Out's line
+; gives one, else IO$_READVBLK. POC_READ_CHANNEL is the channel until
+; POC_TASK_READ_DONE, and lines written meanwhile break through the read
+; (POC_PUT_LINE). R0 $QIO's status
+	.ENTRY	POC_TASK_READ, ^M<R2,R3>
+	CLRL	R2
+	CALLS	#0, POC_OUT_IS_TERMINAL
+	BLBC	R0, 10$
+	CALLS	#0, POC_TAKE_PROMPT
+	MOVL	R0, R2
+10$:	MOVL	#IO$_READVBLK, R3
+	TSTL	R2
+	BEQL	20$
+	MOVL	#IO$_READPROMPT, R3
+20$:	MOVZWL	4(AP), POC_READ_CHANNEL
+	PUSHL	R2
+	PUSHAB	POC_PROMPT
+	CLRQ	-(SP)
+	PUSHL	12(AP)
+	PUSHL	8(AP)
+	PUSHL	24(AP)
+	PUSHL	20(AP)
+	PUSHL	16(AP)
+	PUSHL	R3
+	PUSHL	4(AP)
+	CLRL	-(SP)
+	CALLS	#12, G^SYS$QIO
+	BLBS	R0, 30$
+	CLRL	POC_READ_CHANNEL
+30$:	RET
+
+; POC_TASK_READ_DONE: the read POC_TASK_READ started has ended
+	.ENTRY	POC_TASK_READ_DONE, ^M<>
+	CLRL	POC_READ_CHANNEL
+	RET
 
 ; POC_FILE_REWIND(control): the file's records to be read from the
 ; first again; R0 the status

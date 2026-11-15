@@ -597,11 +597,14 @@ of traps says what each covers), with one more, 15:
 | 16 | `coroutine body returned` | `%X10000082` |
 | 17 | `Transfer to a coroutine never initialized`, and one text for each other misuse of `Coroutines` | `%X1000008A` |
 | 18 | `no memory for a coroutine's stack` | `%X10000092` |
+| 19 | `all tasks are blocked` | `%X1000009A` |
+| 20 | `Unlock of a mutex the running task does not hold`, and one text for each other misuse of `Tasks` | `%X100000A2` |
 
 Trap 15 is the VAX's alone: a program whose asynchronous system traps
 allocate, and which does not import `AsynchronousTraps`, ends so. 16 to
 18 are `Coroutines`' (chapter 6), and 17's `Transfer at AST level` is
-the VAX's own.
+the VAX's own. 19 and 20 are `Tasks`' (chapter 6), and 20's
+`AwaitReadable or AwaitWritable on VAX/VMS` is the VAX's own.
 
     $ RUN TRAPS
     index out of range
@@ -670,7 +673,7 @@ declarations VMSDEF has already.
 
 ### What is not there yet
 
-voc's library modules (the *User's Guide*, chapter 11), which poc for
+voc's library modules (the *User's Guide*, chapter 13), which poc for
 Unix does not have either. `SYSTEM.CC`, `GETREG` and `PUTREG`. D_floating
 and H_floating, and the vector and privileged system services
 (appendix B).
@@ -706,6 +709,8 @@ has, described at the end of this chapter.
 | `VT100` | `Out.Flush` | Each sequence reaches the terminal as it is sent. |
 | `GarbageCollectedHeap` | `LIB$GET_VM`, `$DCLEXH` | The heap is limited by the paging file quota. |
 | `Coroutines` | `LIB$GET_VM_PAGE`, `$SETPRT`, `COROUTINESWITCH.MAR` | Smaller stacks, counted against the paging file quota whole. |
+| `Tasks` | `Coroutines`, `$HIBER`, `$WAKE`, `$SETIMR`, `$GETTIM` | An AST posts, not a signal handler. No `AwaitReadable` or `AwaitWritable`. |
+| `TaskInput` | `$ASSIGN`, `$QIO`, `Platform.Read` | A terminal or mailbox is read a record at a time; a file stops every task. |
 
 ### Files
 
@@ -946,6 +951,59 @@ and on VMS it is assembled once, as `POCRTL.OBJ` is:
 
     $ MACRO/OBJECT COROUTINESWITCH.MAR
     $ @WORDSETS
+
+### Tasks
+
+`Tasks` has the same interface as on Unix (the *User's Guide*, chapter
+12), and the same programs run unchanged, but for `AwaitReadable` and
+`AwaitWritable`. What differs is how the program waits when no task can
+run, what may post an event, and how standard input is read.
+
+**The idle wait.** When every task waits, `Tasks` hibernates the process
+with `$HIBER`, and asks for its nearest timer by `$SETIMR`, whose AST
+wakes it. `Post` calls `$WAKE`, which VMS remembers if it comes before
+the process hibernates, so no post is lost. The timer carries `Tasks`'
+own request identifier, so that `$CANTIM` cancels it alone, and `Tasks`
+never calls `$SCHDWK` or `$CANWAK`: `$CANWAK` would cancel every
+scheduled wakeup in the process, a program's own included. A `$HIBER`
+that ends for some other reason is harmless; `Tasks` looks again. The
+clock is the system time from `$GETTIM`, which ticks every 10 ms, so
+`Sleep` and `After` wait at least their time and up to a tick or two
+more. `SetIdleStep` replaces the wait, as on Unix.
+
+**Stacks.** A task's stack is a coroutine's, so `Tasks.DefaultStackSize`
+is 32 KiB and the least is 8 KiB, counted against the paging file quota
+as `Coroutines`' are. A task that recurses deeply needs a larger
+`Start(t, size)`.
+
+**Waiting for I/O.** There is no `AwaitReadable` or `AwaitWritable`;
+each ends the program by trap 20. A task waits for a device by queueing
+a `$QIO` whose completion AST posts an event, and awaiting the event
+(chapter 14 shows one). `Post` is the one procedure of `Tasks` an AST
+may call. Any other, any that might block, is undefined at AST level,
+and is not checked, since the check would cost every call; that
+includes the switch underneath, which `Coroutines.Transfer` checks but
+`Tasks` does not.
+
+**Standard input.** `TaskInput`'s `Char` and `Line` read `SYS$INPUT` as
+a task. A terminal or a mailbox is read a record at a time by a `$QIO`,
+and only the task that reads waits. On a terminal, `Out`'s unfinished
+line is the prompt, and `Out`'s and `Err`'s lines break through a
+pending read (`IO$M_BREAKTHRU`), so that a task's output appears while
+the user types, and the line typed so far is drawn again under it. A
+disk file is read by RMS, and every task waits while it is. As on Unix,
+a program reads standard input through `In` or through `TaskInput`,
+never both.
+
+**The debugger.** The default debugger runs in a process of its own and
+loses a remembered `$WAKE`, so a program that uses `Tasks` can hang
+under it. Run such a program under the debugger only after
+
+    $ DEFINE DBG$PROCESS NONE
+
+**Building from the runtime's source.** `Tasks` imports `Coroutines`,
+so a program built from `rtl/vax`'s source names `COROUTINESWITCH.OBJ`
+to the link and assembles it on VMS, as above.
 
 ### Three modules VMS alone has
 
@@ -2747,8 +2805,8 @@ middle of a library routine. So at AST level a program may use:
 - `NEW` and its own variables;
 - system services, and the `LIB$` routines the RTL manual calls
   AST-reentrant;
-- `AsynchronousTraps`, `EventFlags.Set`, `Clear` and `IsSet`, and
-  `Timers.After` and `Cancel`.
+- `AsynchronousTraps`, `EventFlags.Set`, `Clear` and `IsSet`,
+  `Timers.After` and `Cancel`, and `Tasks.Post`.
 
 It may not use `Out`, `Err`, `In`, `Files`, `Texts` or `Oberon`, whose
 state the main program may be halfway through changing. It must not wait
@@ -2899,6 +2957,103 @@ END Mailbox.
 during the write, and its AST runs then, at the latest before `$QIOW`
 returns. `$QIO`'s buffer, its `P1`, is passed by reference, since
 `received` is a variable (chapter 7), and VMS writes to it.
+
+### A completion AST and a task
+
+In a program that uses `Tasks` (chapter 6), a task waits for a request
+the same way, but on an event that the AST posts instead of an event
+flag, so that the other tasks run while it waits. This program's reader
+task queues a read from a mailbox, awaits the event the read's AST
+posts, prints the message, and queues the next read, until a read ends
+with the end of file. The main task writes two messages to the mailbox
+and then the end of file, sleeping in between, so the reader waits each
+time; `IO$M_NOW` lets each write return without waiting for its reader:
+
+<!-- example: vax/taskmailbox/TaskMailbox.Mod -->
+```
+MODULE TaskMailbox;
+  IMPORT SYSTEM, Out, Tasks, STARLET, IODEF, VmsArguments;
+
+  TYPE
+    Reader = POINTER TO RECORD (Tasks.TaskDesc) END;
+
+  VAR
+    channel: SYSTEM.CARD16;
+    readStatus: VmsArguments.IOStatusBlock;
+    received: ARRAY 64 OF CHAR;
+    readDone: Tasks.Event; (* posted by ReadDone *)
+    reader: Reader;
+
+  (* an AST routine, a read's completion: it only posts *)
+  PROCEDURE ReadDone(parameter: SYSTEM.CARD32);
+  BEGIN
+    Tasks.Post(readDone)
+  END ReadDone;
+
+  (* reads the mailbox a message at a time, to its end of file *)
+  PROCEDURE (r: Reader) Run*;
+    VAR status: SYSTEM.INT32;
+  BEGIN
+    LOOP
+      status := STARLET.SYS$QIO(0, channel, IODEF.IO$_READVBLK, readStatus,
+        ReadDone, 0, received, LEN(received) - 1, 0, 0, 0, 0);
+      Tasks.Await(readDone);
+      IF ~ODD(readStatus.status) THEN EXIT END;
+      received[readStatus.count] := 0X;
+      Out.String("  read: "); Out.String(received); Out.Ln
+    END;
+    Out.String("  the end of file"); Out.Ln
+  END Run;
+
+  (* writes a message, or with function IO$_WRITEOF an end of file,
+     without waiting for it to be read *)
+  PROCEDURE Write(function: SYSTEM.CARD16; text: ARRAY OF CHAR);
+    VAR status: SYSTEM.INT32; writeStatus: VmsArguments.IOStatusBlock;
+      message: ARRAY 64 OF CHAR; length: LONGINT;
+  BEGIN
+    message := text; length := 0;
+    WHILE message[length] # 0X DO INC(length) END;
+    status := STARLET.SYS$QIOW(0, channel, function + IODEF.IO$M_NOW,
+      writeStatus, NIL, 0, message, length, 0, 0, 0, 0)
+  END Write;
+
+  PROCEDURE Run;
+    VAR status: SYSTEM.INT32;
+  BEGIN
+    status := STARLET.SYS$CREMBX(0, channel, 64, 128, 0, 0, NIL, 0);
+    NEW(reader); Tasks.Start(reader, Tasks.DefaultStackSize);
+    Out.String("the reader waits"); Out.Ln;
+    Tasks.Sleep(100);
+    Out.String("sending one"); Out.Ln;
+    Write(IODEF.IO$_WRITEVBLK, "one"); Tasks.Sleep(100);
+    Out.String("sending two"); Out.Ln;
+    Write(IODEF.IO$_WRITEVBLK, "two"); Tasks.Sleep(100);
+    Out.String("sending the end of file"); Out.Ln;
+    Write(IODEF.IO$_WRITEOF, "");
+    Tasks.Join(reader);
+    status := STARLET.SYS$DASSGN(channel)
+  END Run;
+
+BEGIN
+  Run
+END TaskMailbox.
+```
+
+<!-- vax-session: taskmailbox -->
+
+    $ RUN TASKMAILBOX
+    the reader waits
+    sending one
+      read: one
+    sending two
+      read: two
+    sending the end of file
+      the end of file
+
+`IO$_WRITEOF` writes an end of file, which a read receives as the
+status `SS$_ENDOFFILE`, so the loop ends on a status that is not a
+success. Built from `rtl/vax`'s source, the program is linked with
+`COROUTINESWITCH.OBJ` (chapter 6).
 
 ### `NEW` at AST level
 
@@ -3636,7 +3791,7 @@ can come later if a program needs it.
   G_floating (chapter 5), and poc has no type for the others, so the
   routines of `MTH$` and `OTS$` that take or return them are declared,
   with their values as 8 or 16 bytes, but nothing computes with them.
-- **voc's library modules** (the *User's Guide*, chapter 11), which poc
+- **voc's library modules** (the *User's Guide*, chapter 13), which poc
   for Unix does not have either.
 
 ### From VMSDEF

@@ -1,0 +1,28 @@
+slept at least 10 ms
+slept at least 20 ms
+slept at least 30 ms
+slept at least 50 ms
+the spinner saw the waker
+a1 b1 a2 b2 a3 b3 
+main slept at least 15 ms
+Select: 1, NIL, at least 30 ms
+After sent once
+After(0) at once
+After(-5) in Select: 1
+a closed After got nothing
+done
+== -OC
+slept at least 10 ms
+slept at least 20 ms
+slept at least 30 ms
+slept at least 50 ms
+the spinner saw the waker
+a1 b1 a2 b2 a3 b3 
+main slept at least 15 ms
+Select: 1, NIL, at least 30 ms
+After sent once
+After(0) at once
+After(-5) in Select: 1
+a closed After got nothing
+done
+exit=0

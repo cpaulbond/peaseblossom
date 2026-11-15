@@ -4,9 +4,10 @@ A plan for option C of `doc/research/concurrency-survey.md`: a runtime
 module `Tasks` of cooperative tasks, conditions, locks and channels,
 written in Oberon over `Coroutines` (option B, `doc/developer/coroutines.md`),
 with a way for asynchronous I/O, timers, signals and ASTs to wake a task.
-Its phases follow on from `coroutines.md`'s, so they start at 7. Nothing
-here is decided yet: the decisions below are proposals for the user, and
-the survey's section 9, the starting point, is all **[inferred]**.
+Its phases follow on from `coroutines.md`'s, so they start at 7. The
+decisions below were accepted by the user on 2026-11-14 and amended in
+Phase 8 with Phase 7's probes, which `concurrency-survey.md` section 10
+records; the survey's section 9 was the starting point.
 
 There is still one thread and nothing preempts. A task runs until it
 makes a call that can block (`Yield`, `Join`, `Sleep`, `Wait`, `Lock`,
@@ -89,10 +90,21 @@ DEFINITION Tasks;
 
   TYPE IdleStep = PROCEDURE (timeout: LONGINT);
   PROCEDURE SetIdleStep (step: IdleStep);  (* decision 10 *)
+
+  (* POSIX only (decisions 10 and 11) *)
+  PROCEDURE AwaitReadable (fd: LONGINT);
+  PROCEDURE AwaitWritable (fd: LONGINT);
+  PROCEDURE WakeDescriptor (): LONGINT;
 END Tasks.
+
+DEFINITION TaskInput;   (* Phase 11 *)
+  VAR Done-: BOOLEAN;
+  PROCEDURE Char (VAR ch: CHAR);           (* as In's, the other tasks running *)
+  PROCEDURE Line (VAR line: ARRAY OF CHAR);
+END TaskInput.
 ```
 
-## Decisions (proposed)
+## Decisions
 
 1. **`Tasks` is Oberon over `Coroutines`, the same source on both back
    ends.** What differs by system, the idle step and the traps, is in a
@@ -116,7 +128,10 @@ END Tasks.
    task runs the idle step on its own stack (decision 9). `Yield` puts
    the running task at the queue's end. `Signal` wakes the longest
    waiter. Conditions are Mesa's: a woken task tests again
-   (`WHILE ~ok DO Wait(c) END`).
+   (`WHILE ~ok DO Wait(c) END`). Phase 7.2 measured it against a
+   scheduler coroutine every switch goes through: that costs 2.6-3.5
+   times as much per `Yield` on x86 and 1.3-1.5 times on the VAX (survey
+   10.2), so direct switching stays.
 
 4. **The program ends when the main module's body ends**, as in Go (9.3,
    1). Tasks still running are abandoned: their finalizers run, as
@@ -160,6 +175,17 @@ END Tasks.
    - The scheduler looks at the waiting tasks' events only when the
      global flag is set, so a program that never posts pays one test per
      switch.
+   - **The early poll.** The idle step runs only when no task is ready,
+     so a task that only yields would keep a task waiting for a ready
+     descriptor waiting until it stops (500 of 500 ms in Phase 7.3). So
+     while tasks are ready and some task waits for a descriptor, `Tasks`
+     counts the tasks it picks, and at every 256th reads the clock and,
+     if 1 ms has passed since the last poll, polls without waiting. A
+     ready descriptor then waits about 1 ms and 256 picks at most; a
+     pick costs a few ns more, and nothing when no task waits for a
+     descriptor (survey 10.3). On VMS a completion AST posts an event,
+     and events need no such rule: the scheduler harvests them on every
+     pick.
    - **The idle step, POSIX**: `poll` on the descriptors tasks wait for,
      plus the read end of a self-pipe, with the nearest timer as its
      timeout. `Tasks` sets an "idle" flag before it last looks at the
@@ -167,17 +193,49 @@ END Tasks.
      is set; `write` is async-signal-safe. So a signal that comes between
      the look and `poll` still wakes it. `ppoll` would do the same, but
      NetBSD 9 and older lack it.
-   - **The idle step, VMS**: `$HIBER`, with a `$SCHDWK` for the nearest
-     timer. `Post` at AST level calls `$WAKE`, which VMS remembers if
-     the process is not hibernating yet, so no wake is lost. An I/O
-     wait is a `$QIO` whose completion AST posts an event.
+   - **The idle step, VMS**: `$HIBER`, with a `$SETIMR` for the nearest
+     timer whose AST wakes. `Post` at AST level calls `$WAKE`, which VMS
+     remembers if the process is not hibernating yet, so no wake is
+     lost; an AST that did not wake leaves the process hibernating
+     (survey 10.1). `$SETIMR` carries `Tasks`' own request identifier,
+     so `$CANTIM` cancels its timer alone; `Tasks` never calls `$SCHDWK`
+     or `$CANWAK`, since `$CANWAK` cancels every scheduled wakeup in the
+     process, other code's too. A `$HIBER` that returns for no reason of
+     `Tasks`' own is accepted: it looks again and loops. An I/O wait is a
+     `$QIO` whose completion AST posts an event.
+   - **`Sleep` and `After` wait at least their time.** On OpenBSD and
+     NetBSD `poll` rounds its timeout up to the 10 ms clock tick, so a
+     `Sleep` there ends up to two ticks late (survey 10.3); the VAX's
+     clock ticks every 10 ms too.
+   - Phase 7.3 lost no wake: 10000 posts on each of five Unix hosts,
+     700 a run on the VAX guest, a signal or an AST at random moments.
 
 10. **The idle step can be replaced** (8.4, item 6). `SetIdleStep(p)`
     has `Tasks` call `p(timeout)` instead of its own wait; `-1` means
-    "no limit". pofltk's would be `Fl.Wait(timeout / 1000)`, and FLTK
-    callbacks `Post` the events tasks wait for. A replaced step must
-    return when a handler posts, which `Tasks` cannot ensure: the guide
-    says so. pofltk is Unix only, so this is a hook, not a dependency.
+    "no limit". After `p` returns, `Tasks` polls without waiting, which
+    finds ready descriptors and empties the self-pipe. pofltk's is
+    `Fl.Wait(timeout / 1000)`, and FLTK callbacks `Post` the events tasks
+    wait for. pofltk is Unix only, so this is a hook, not a dependency.
+    Phase 7.4 ran it (survey 10.4) and showed three rules the guide
+    gives, since `Tasks` cannot check them:
+    - **A replaced step must return when a handler posts.** On POSIX
+      `Tasks` exports `WakeDescriptor()`, the self-pipe's read end, and
+      the step must return when it is readable: pofltk's watches it
+      with `Fl.WatchFd` and an action that does nothing. Without that, a
+      signal that comes between `Tasks` marking itself idle and FLTK
+      entering `select` waited for FLTK's next event (one in 1000, 999
+      ms), and a post from an FLTK timer's action waited for the next
+      timer (9 ms on average, against 0.1 ms watched).
+    - **A replaced step must watch the descriptors tasks wait for**, or
+      a task in `AwaitReadable` waits for the step's next event. The
+      simplest way is the toolkit's own watch, whose action posts an
+      `Event` the task awaits.
+    - **A replaced step runs on the stack of whichever task idles**, so
+      every task needs room for the toolkit's event handling: FLTK and
+      Xlib crashed on 32 KiB stacks and ran on 40 KiB, and
+      `DefaultStackSize` is the guide's advice. Running the step on the
+      main program's stack instead would cost two switches per idle
+      step.
 
 11. **I/O wrappers are separate modules.** `Tasks` exports no I/O.
     - **`TaskInput`**, on both back ends: `Line(VAR s)` and `Char(VAR
@@ -202,20 +260,45 @@ END Tasks.
     as a coroutine never freed does. A task blocked on a channel nothing
     else can reach is a leak, as in Go, and the guide says so.
 
+13. **On VMS, `Tasks` switches without `Coroutines`' AST-level check.**
+    In a program that imports `AsynchronousTraps` (STARLET does, and so
+    does most of VMSLIB), `Coroutines.Transfer` calls `LIB$AST_IN_PROG`
+    and `$SETAST` twice, which made a `Yield` pair 30 µs instead of 7.5
+    on the guest (survey 10.3). Measured alone, `LIB$AST_IN_PROG` is
+    8.6-16.4 µs a call and the `$SETAST` pair 2.0-2.6 µs (Phase 8,
+    2026-11-14), so the check is most of it, and the pair, which keeps
+    an AST's collection from scanning the wrong stacks, is not optional.
+    `Coroutines` gets one export for `Tasks`, a `Transfer` without the
+    AST-level check, as `GarbageCollectedHeap` has exports for
+    `Coroutines` that are undefined otherwise; `Transfer` itself is
+    unchanged. A blocking call of `Tasks` in an AST routine is then
+    undefined, not trap 17, and the guide says so, as it already says a
+    blocking call in a signal handler is wrong. The finalizer check
+    stays: it is one test. On LLVM nothing changes, since the signal
+    handler check is one test too.
+
+14. **What else the guide says** (survey 10.1, 10.2):
+    - An override of `Run` must be exported (`PROCEDURE (t: T) Run*`),
+      since the base procedure is.
+    - On VMS, run a `Tasks` program under the debugger only with
+      `DEFINE DBG$PROCESS NONE`: the default two-process debugger loses
+      a remembered `$WAKE`, and the program can hang.
+
 ## What changes
 
 | File | Change |
 |---|---|
 | `rtl/llvm/Tasks.Mod`, `rtl/vax/Tasks.Mod` (new, the same file) | Tasks, the run queue, conditions, mutexes, channels, `Select`, timers, events, deadlock detection |
 | `rtl/llvm/TaskWaiting.Mod` and `.c` (new) | `poll`, the self-pipe, the clock, `AwaitReadable`/`AwaitWritable`'s descriptor list, traps 19 and 20 |
-| `rtl/vax/TaskWaiting.Mod` (new) | `$HIBER`, `$WAKE`, `$SCHDWK`, `$CANWAK`, the clock, traps 19 and 20 through `POC_TRAP` |
+| `rtl/vax/TaskWaiting.Mod` (new) | `$HIBER`, `$WAKE`, `$SETIMR`, `$CANTIM`, the clock, traps 19 and 20 through `POC_TRAP` |
+| `rtl/llvm/Coroutines.Mod`, `rtl/vax/Coroutines.Mod` | The `Transfer` without the AST-level check, for `Tasks` (decision 13); on LLVM the same as `Transfer` |
 | `rtl/llvm/TaskInput.Mod`, `rtl/vax/TaskInput.Mod` (new) | Standard input read as a task |
 | `rtl/vax/PocRtl.mar` | Texts for 19 and 20, with 20's cases by high word |
 | `GNUmakefile`, the kits | The new modules carried and built |
 | `packaging/` | The PLISTs list the new modules' files |
 | `doc/developer/language-extensions.md`, `AGENTS.md` | Trap rows 19 and 20. A section "Tasks" after "Coroutines" |
 | `rtl/llvm/README.md`, `rtl/vax/README.md`, `doc/reference-guide.md` | The modules' entries; `tools/rtl-reference update` |
-| `doc/users-guide.md`, `doc/examples/` | A chapter on tasks, with decision 13's examples |
+| `doc/users-guide.md`, `doc/examples/` | A chapter on tasks, with Phase 12's examples |
 | `doc/vax-vms-guide.md` | Tasks on VMS: `$HIBER`, an AST that posts, `$QIO` |
 | `doc/research/concurrency-survey.md`, `PLAN.md` | Section 6 and Phase 19's candidate 7 record C as adopted |
 
@@ -234,10 +317,10 @@ record of the results, as a section 10.
 
 #### Phase 7.1: The manual
 
-The VMS 5.5 *System Services Reference Manual* is not downloaded yet
-(`vax-vms-manuals-to-get.md`). Fetch it, and check `$HIBER`, `$WAKE`'s
-remembered wake, `$SCHDWK`, `$CANWAK`, and `$QIO`'s AST on a terminal
-read, against it.
+Check `$HIBER`, `$WAKE`'s remembered wake, `$SCHDWK`, `$CANWAK`, and
+`$QIO`'s AST on a terminal read, against the VMS 5.5 *System Services
+Reference Manual* (`AA-LA69B`, fetched 2026-10-05; this plan said
+otherwise until Phase 8). Done: survey 10.1.
 
 #### Phase 7.2: A prototype
 
@@ -266,7 +349,9 @@ window stays live, and a button's callback that posts.
 Write the decisions, with Phase 7's results, into `language-extensions.md`
 (trap rows 19 and 20, a section "Tasks" after "Coroutines") and
 `AGENTS.md`'s summary, and give the plan an entry in `PLAN.md`'s "Ongoing
-library enhancements".
+library enhancements". Done 2026-11-14: decisions 3, 9 and 10
+amended, 13 and 14 added, the interface given `WakeDescriptor`,
+`AwaitReadable` and `AwaitWritable`.
 
 ### Phase 9: The core
 
@@ -288,6 +373,14 @@ on the guest:
   tasks' stacks survive many collections;
 - `tasks-same-source`: the two `Tasks.Mod` are the same.
 
+Done 2026-11-14. On the guest, `vax-tasks` runs llvm-tasks', -channels'
+and -sync's programs in one fixture (VMS file names ignore case, so the
+modules are renamed: `TaskBasics`, `TaskChannels`, `TaskSync`), with
+2000 short tasks, not 20000, and the deep task given 128 KiB (its 200
+frames do not fit the VAX's 32 KiB default); `vax-tasks-traps` leaves
+out the signal handler's case, since a blocking call in an AST is
+undefined on VMS (decision 13).
+
 ### Phase 10: Time and events
 
 `Sleep`, `After`, `Event`, `Await`, `Post`, `SetIdleStep`, the idle step
@@ -299,11 +392,158 @@ on POSIX and VMS, and `AwaitReadable`/`AwaitWritable` on POSIX. Fixtures:
 - `vax-tasks-time`, `vax-tasks-events`: the same on the guest, with an AST
   from `Timers.After` and a mailbox `$QIO`.
 
+Done 2026-11-14. Decision 9's early look every 256th pick takes in the
+clock too while a timer is pending, so a sleeper wakes on time beside
+tasks that only yield (`llvm-tasks-time`'s spinner). A task in `Await` is
+never a deadlock (19), since a signal handler or an AST may post. On VMS
+`AwaitReadable` and `AwaitWritable` are trap 20's case 7; POSIX's case 6
+is a negative descriptor. The VMS clock is `$GETTIM`'s system time, not a
+monotonic one; a failed `$SETIMR` makes the scheduler look again at once
+rather than hang, and on POSIX a failed `pipe()` caps each wait at 10 ms.
+`llvm-tasks-events`' C part (a writing child, a signalling child) is in
+`part/`, since the conformance tree ignores and deletes `*.c`.
+`vax-tasks-time` sleeps ten times as long as `llvm-tasks-time` (the VAX's
+clock ticks every 10 ms) and builds `Timers` from `rtl/vax/vmslib` and
+STARLET's source; `vax-tasks-events` declares its system services itself,
+as the probe did. A text with a `/` in `PocRtl.mar` is delimited by
+quotes (MACRO-32 took `VAX/VMS`'s for the end of `.ASCIC`).
+
 ### Phase 11: Standard input
 
-`TaskInput` on both back ends. Fixtures: on Unix, lines fed through a
+`TaskInput` on both back ends. Two questions from Phase 7.1 (survey 10.1)
+are settled here: on a VMS terminal, output queues behind a pending read
+once the user starts typing, so a ticker task's output stops the whole
+process until the line ends; and a `SYS$INPUT` that is a disk file is
+not read by a record `$QIO`, so `TaskInput` on VMS needs a synchronous
+RMS fallback when it is neither a terminal nor a mailbox. Fixtures: on Unix, lines fed through a
 pipe slowly while a ticker task runs, its ticks interleaved with them;
 on the guest, the same from a file and from a mailbox.
+
+**Proposals (2026-11-14, for the user's approval).** The terminal
+question was probed first (survey 10.6). While a read is pending and the
+user types, a plain RMS write waits, and the whole process waits with
+it. A `$QIOW` with `IO$M_BREAKTHRU!IO$M_REFRESH` goes through at once,
+from any channel to the terminal, and VMS then redraws the prompt and
+what has been typed.
+
+1. **The interface**, the same on both back ends:
+
+   ```oberon
+   DEFINITION TaskInput;
+     VAR Done-: BOOLEAN;
+     PROCEDURE Char (VAR ch: CHAR);
+     PROCEDURE Line (VAR line: ARRAY OF CHAR);
+   END TaskInput.
+   ```
+
+   - `Char` and `Line` mean what `In`'s do: `Line` cuts a line short
+     when it does not fit and leaves the rest for the next read, and at
+     the end of the input `Done` is FALSE and `ch` is 0X. Both read
+     through a `FormattedInput.Source` of TaskInput's own, as `In` does,
+     with the same read-ahead rule, so that a line is returned without
+     waiting for the next one. Only the source's `Ready` waits, as a
+     task.
+   - `Done` is read right after a call. Nothing can switch in between,
+     so another task's call cannot change it first.
+   - An internal `Tasks.Mutex` holds each call, so that two tasks
+     reading at once take whole lines, not each other's characters.
+   - A program reads standard input through `In` or through
+     `TaskInput`, not both. Each module reads ahead of what it returns,
+     and on VMS each reads on its own channel. The guide says so, and
+     nothing checks it.
+   - `In`'s other procedures (`Int`, `Name`, ...) would each be one
+     line over the same source. They are left out until wanted.
+
+2. **POSIX** (`rtl/llvm/TaskInput.Mod`, Oberon only):
+   - The module keeps a 4 KiB buffer. When it is empty,
+     `Tasks.AwaitReadable(0)`, then one `Platform.Read` of up to 4 KiB.
+     A count of 0, or an error, is the end of the input. `Platform`'s C
+     already retries a read that EINTR interrupts.
+   - `O_NONBLOCK` is never set: descriptor 0 is shared with the shell,
+     and the flag would outlive the program.
+   - A terminal in canonical mode is readable only once a line is
+     complete, and a pipe once data is there, so the read does not
+     block. A regular file and `/dev/null` are always readable, and
+     their read returns at once.
+   - The one case that blocks every task: another process holding the
+     same descriptor takes the data between the `poll` and the `read`.
+     The guide says so.
+
+3. **VMS: by `SYS$INPUT`'s device class** (`rtl/vax/TaskInput.Mod`),
+   found by `$GETDVIW DVI$_DEVCLASS` at the first read:
+   - **A terminal or a mailbox**: `$ASSIGN` `SYS$INPUT`. Each record is
+     read by a `$QIO` into a 512-byte buffer, with an AST that posts an
+     `Event` the reading task awaits.
+     - A record gets a line feed after it, except a terminal read ended
+       by a full buffer (terminator size 0, I/O manual 8.5). The rest of
+       such a line comes with the next read.
+     - The end of the input is `SS$_ENDOFFILE`: a mailbox's
+       `IO$_WRITEOF`, or a terminal's. A terminal read whose terminator
+       is Ctrl/Z (1AX) is the end as well, as RMS takes it.
+     - A mailbox message longer than 512 bytes is cut short
+       (`SS$_BUFFEROVF`).
+   - **Anything else** (a disk file, a batch job's input, `NL:`):
+     `Platform.Read(StdIn)`, synchronously, as `In` does. It blocks
+     every task while RMS reads, as decision 11 says of a disk read.
+
+4. **Output while a terminal read is pending: breakthrough**
+   (`rtl/vax/PocRtl.mar`):
+   - From the read's `$QIO` until the reading task resumes,
+     `POC_READ_CHANNEL` holds the read's channel (0 when none is
+     pending), so that `POC_TRAP` knows which to `$CANCEL`.
+   - While it is set, and `SYS$OUTPUT` is a terminal, `POC_PUT_LINE`
+     writes the record by `$QIOW IO$_WRITEVBLK!IO$M_BREAKTHRU!IO$M_REFRESH`
+     on `POC_OUT_CHANNEL`, with the line feed and carriage return a
+     record has, instead of `LIB$PUT_OUTPUT`. `POC_FLUSH_OUTPUT`'s
+     partial lines go the same way.
+   - `Err`'s lines go the same way when `SYS$ERROR` is a terminal, on a
+     channel of its own.
+   - `POC_TRAP` first `$CANCEL`s a pending read, so that a trap's
+     message is not held until the user presses Return.
+   - A program that does not import `TaskInput` pays one test of a
+     longword per line.
+   - The alternative, documenting that output stops, is not proposed:
+     the probe showed every task stopped for as long as the user takes
+     over a line.
+
+5. **The prompt, as `In`'s on VMS.** On a terminal, Out's unfinished
+   line becomes the read's prompt, after a line feed, exactly as
+   `POC_INPUT_GET` does for `In` (`IO$_READPROMPT`). So
+   `Out.String("Command? "); TaskInput.Line(s)` looks the same as with
+   `In`, and `REFRESH` redraws the prompt after each breakthrough
+   write.
+   - A new `POC_TASK_READ(channel, buffer, size, iosb, ast, parameter)`
+     in `PocRtl.mar` builds the prompt, issues the `$QIO` and sets
+     `POC_READ_CHANNEL`, and `POC_TASK_READ_DONE` clears it.
+   - On POSIX nothing is needed, since `Out` is unbuffered.
+
+6. **Fixtures**, each comparing its output, each with its `.gitignore`
+   line:
+   - `llvm-tasks-input`:
+     - A ticker task every 50 ms beside the main task reading lines,
+       fed by a shell pipeline that writes a line every 300 ms. The
+       output records the order of lines and runs of ticks ("ticks
+       between lines: yes"), not counts that depend on timing.
+     - Also: the same lines from a regular file and then the end,
+       `/dev/null`, `Char` across a line end, a long line cut short,
+       and two reading tasks taking whole lines.
+   - `vax-tasks-input`, both ways (MACRO-32 and objects):
+     - From a file: the synchronous fallback.
+     - From a mailbox: a feeder program `$CREMBX`es a mailbox, starts
+       the reader by `LIB$SPAWN` with the mailbox as its input
+       (`NOWAIT`), writes lines with pauses, then `IO$_WRITEOF`. The
+       ticks interleave as on Unix.
+   - `vax-tasks-terminal`: the probe's way, by telnet through
+     `tools/vax-login.tcl`. A ticker runs while the script types a
+     line slowly. Compared: ticks arrive while the line is being typed,
+     the line comes back whole, the prompt is redrawn, and Ctrl/Z ends
+     the input. This is the one fixture that drives the guest's
+     terminal itself. It tests proposal 4, the riskiest change.
+
+7. **Documents in this phase**: `TaskInput`'s `DEFINITION` in this
+   file's interface, and the rules in proposals 1 to 4 in
+   `language-extensions.md`'s "Tasks" and `AGENTS.md`'s summary. The
+   guide chapter and the READMEs come in Phases 12 and 13, as planned.
 
 ### Phase 12: Examples
 
@@ -319,12 +559,22 @@ them, checked by `tools/guide-examples`, and run on the guest by
 A pofltk example, from Phase 7.4, goes into pofltk's own repository,
 not poc's.
 
+Done 2026-11-14. On the guest a mailbox stands in for the terminal:
+`ClockFeeder`, a subprocess, feeds `Clock` its commands, and the
+mailbox's messages must hold TaskInput's 512-byte read (`PLAN.md`,
+"Ongoing bug fixing", 20).
+
 ### Phase 13: Documents and packaging
 
 `rtl/llvm/README.md`, `rtl/vax/README.md`, `tools/rtl-reference update`,
 the VAX/VMS Guide's "Tasks", the PLISTs, `PLAN.md`'s entry marked
 `[done]`, and the survey and Phase 19's candidate 7 recording C as
 adopted.
+
+Done 2026-11-14. The Reference Guide was already current. The VAX/VMS
+Guide's "Tasks" is in chapter 6, and chapter 14's "A completion AST and
+a task" has an example, `TaskMailbox`, a task that waits for a mailbox
+`$QIO` whose AST posts, run by `doc-vax-guide`.
 
 ## Later
 

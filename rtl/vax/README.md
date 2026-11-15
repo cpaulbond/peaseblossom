@@ -172,3 +172,23 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   `COROUTINESWITCH.OBJ`, as `POCRTL` has it. `Transfer` at AST level
   traps (17), and one that may be followed by an AST's `NEW` holds ASTs
   off until the coroutine resumed enables them again.
+- `Tasks.Mod` - cooperative tasks over `Coroutines`
+  (`doc/developer/tasks.md`), the same file as `rtl/llvm/Tasks.Mod`
+  (fixture `tasks-same-source`). It switches with
+  `Coroutines.TransferForTasks`, which leaves out `Transfer`'s check for
+  AST level (decision 13), so a call that blocks in an AST is undefined.
+- `TaskWaiting.Mod` - `Tasks`' system part: the clock (`$GETTIM`), the
+  idle wait (`$HIBER`, with a `$SETIMR` of its own for a timeout), the
+  wake an AST gives (`$WAKE`), and the traps 19 (all tasks blocked) and
+  20 (misuse, by case), through `POC_TRAP`, whose texts are in
+  `PocRtl.mar`. VMS has no descriptors to wait for: `AwaitReadable` and
+  `AwaitWritable` trap (20), and an I/O wait is a `$QIO` whose AST posts
+  an event.
+- `TaskInput.Mod` - standard input read by a task (`doc/developer/tasks.md`,
+  Phase 11), the interface of `rtl/llvm/TaskInput.Mod`. A terminal or a
+  mailbox is `$ASSIGN`ed and read a record at a time by a `$QIO` whose AST
+  posts the reading task's event; a terminal read goes through
+  `PocRtl.mar`'s `POC_TASK_READ`, which makes `Out`'s unfinished line its
+  prompt and lets lines written meanwhile break through it. Anything else
+  (a disk file, a batch job's input, `NL:`) is read by `Platform.Read`, as
+  `In` reads, and every task waits while RMS reads.

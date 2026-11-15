@@ -687,8 +687,11 @@ A24, moved here 2026-09-26), are Phase 14 now.
    module (option B), was **adopted 2026-11-13** and implemented on both
    back ends the same day (`doc/developer/coroutines.md`; "Ongoing
    library enhancements", 4; `language-extensions.md`, "Coroutines").
-   **Undecided**: a heap re-entry trap on LLVM like the VAX's trap 15,
-   and a cooperative tasks library (item 3).
+   Item 3, a cooperative tasks library over it (option C), was
+   **adopted 2026-11-14** and implemented on both back ends the same
+   day (`doc/developer/tasks.md`; "Ongoing library enhancements", 5;
+   `language-extensions.md`, "Tasks"). **Undecided**: a heap re-entry
+   trap on LLVM like the VAX's trap 15.
 
 **Exit gate**: every candidate has a recorded decision; each adopted one has
 fixtures, is rejected by `-strict`, and passes `make check` on Linux and the
@@ -1262,6 +1265,33 @@ Those fixed while Phase 18 was current, 8-10, are in
     `:=`, two-dimensional, of a field, of a local, in a set and in a call
     through a procedure variable), also in `test/vax-suite.list`.
 
+19. **`vax-coroutines-asts` depends on how fast the guest runs**. Found
+    2026-11-14, in Tasks Phase 9's gate: with atla busy with `make check`
+    and three hosts' copies, the objects way printed "collections during
+    the run: 2" where the fixture expects "3 or more"; the macro32 way,
+    and the rerun in the same `make check`, passed. The program stops
+    after 200 batches of its 10 ms timer AST, about 2 s of the guest's
+    clock, so how much the coroutines allocate in that time, and so how
+    many collections run, follows from how fast SIMH runs. A likely fix:
+    the main loop goes on until it has both its batches and 3 collections,
+    so the count is a condition of the run's end, not of its speed.
+    Seen again 2026-11-14 in Phase 10's gate, the objects way on atla,
+    with a rerun that passed.
+
+20. **TaskInput takes a failed mailbox read for the end of the input**.
+    Found 2026-11-14, in Tasks Phase 12's `vax-tasks-examples`: a
+    feeder's mailbox made with a maximum message of 64 bytes (`$CREMBX`)
+    gave the spawned Clock "end of input" at its first read, before
+    anything was written. TaskInput reads a mailbox by `$QIO` into its
+    buffer of 512 bytes, the read fails, and `ReadRecord` sets `atEnd` on
+    any failure but `SS$_BUFFEROVF`; the subprocess's DCL then read the
+    commands meant for Clock, and its `STOP` ended the subprocess. With a
+    maximum of 1024 (the fixture's fix) it works. A likely fix: read at
+    most the mailbox's maximum message size (`DVI$_DEVBUFSIZ`, asked for
+    with the device class), and make a failure other than the end of
+    file an error, not the end. The status the read returns is still to
+    be seen.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
@@ -1297,6 +1327,21 @@ Those done while Phase 15 was current, 1 and 2, are in
     and `rtl/vax` (fixtures `llvm-coroutines-*`, `vax-coroutines-*`),
     with the User's Guide's chapter 11 and the VAX/VMS Guide's
     "Coroutines".
+
+5.  A `Tasks` module on both back ends [done] (the user, 2026-11-14; Phase
+    19's candidate 7, option C of `doc/research/concurrency-survey.md`,
+    whose section 10 records its probes): cooperative tasks over
+    `Coroutines`, the same Oberon source in `rtl/llvm` and `rtl/vax`,
+    with Mesa conditions, mutexes, channels, `Select`, `Sleep`, `After`,
+    events a signal handler or an AST may post, a replaceable idle step
+    (for pofltk), `AwaitReadable`/`AwaitWritable` on POSIX, a
+    `TaskInput` module, and trap statuses 19 and 20. No compiler
+    change. The plan, fourteen decisions (decided 2026-11-14, Phase 8)
+    and seven phases (7-13), is in `doc/developer/tasks.md`; the work
+    is on the `tasks` branch. Implemented 2026-11-14 in `rtl/llvm` and
+    `rtl/vax` (fixtures `llvm-tasks-*`, `vax-tasks-*`), with the User's
+    Guide's chapter 12 and its examples, and the VAX/VMS Guide's
+    "Tasks".
 
 ## Ongoing language enhancements
 

@@ -1,0 +1,39 @@
+build status: %X10000001
+-- lines, from a file
+line: alpha
+line: beta
+line: gamma
+end
+-- lines, from NL:
+end
+-- short
+piece: abcdefg
+piece: hijklmn
+piece: op
+piece: xy
+piece: 
+piece: last, w
+piece: ith no 
+piece: line en
+piece: d
+end
+-- chars
+97 98 10 99 100 10 10 101 10 
+end, ch 0
+-- two
+taken: one
+taken: two
+taken: three
+taken: four
+taken: five
+taken: six
+both readers took lines: yes
+-- ticks, from a mailbox written slowly
+subprocess ended, status odd: yes
+feeder status: %X00000001
+line: one
+line: ; ticks while awaited: yes
+a line of 512 characters; ticks while awaited: yes
+line: two; ticks while awaited: yes
+line: three; ticks while awaited: yes
+end

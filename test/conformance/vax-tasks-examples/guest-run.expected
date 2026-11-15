@@ -1,0 +1,39 @@
+build status: %X10000001
+$ primes 5
+2
+3
+5
+7
+11
+run status: %X00000001
+$ primes
+2
+3
+5
+7
+11
+13
+17
+19
+23
+29
+run status: %X00000001
+$ primes 200, its last line
+run status: %X00000001
+1223
+$ clock, from commands.txt
+started
+stopped at 0:00
+start, stop, lap, reset or quit
+end of input
+run status: %X00000001
+$ clock 2, from a mailbox written at the guide's times
+subprocess ended, status odd: yes
+feeder status: %X00000001
+started
+0:01
+0:02
+lap 0:02
+0:03
+stopped at 0:03
+no command for 2 seconds
