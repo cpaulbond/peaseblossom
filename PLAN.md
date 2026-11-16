@@ -1397,7 +1397,12 @@ Those fixed while Phase 18 was current, 8-10, are in
     valgrind), behind `#ifdef` where the header may be missing. Until
     then posockets runs its task tests under `valgrind --tool=none
     --track-fds=yes`, for open descriptors only, so memcheck checks
-    nothing a task runs.
+    nothing a task runs. Analysed 2026-11-15
+    (`doc/developer/coroutines-under-valgrind.md`): a switch between two
+    neighbouring coroutine stacks is taken for a push or a pop;
+    registering the stacks, tried, leaves 0 errors. The plan copies
+    `valgrind.h` into `rtl/llvm` and keeps each stack's id in its
+    descriptor.
 
 ## Ongoing library enhancements
 
