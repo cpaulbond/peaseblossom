@@ -1464,6 +1464,121 @@ Those done while Phase 15 was current, 1 and 2, are in
     `doc/developer/tasks.md`, decision 15; fixtures `llvm-tasks-timed`
     and `llvm-tasks-traps`' cases 17 and 18.
 
+7.  System services beyond voc's `Platform` (the user, 2026-11-16, after
+    pogemini's rc scripts). A plan; nothing is decided or done yet.
+
+    **Why.** The programs built on poc so far each carry C for the same
+    operating-system services, because poc can't name `struct stat`,
+    `struct sigaction`, `struct passwd`, the `O_*` and `S_IS*` macros
+    or `errno` portably across Linux, the BSDs, i386 and amd64:
+
+    | Where | What its C does |
+    |---|---|
+    | pogemini `GemServer.c` | catches SIGTERM and SIGINT once each, and makes a UTC timestamp by hand |
+    | pogemini `GemUser.c` | becomes another user: `getpwnam`, `initgroups`, `setgid`, `setuid` |
+    | pogemini `GemFiles.c` | `realpath`, `open` with `O_NOFOLLOW`/`O_NONBLOCK`/`O_CLOEXEC`, a file's kind by `fstat` |
+    | polibtls `Tls.c` | a monotonic clock in ms; whether a descriptor is non-blocking |
+    | posockets `Sockets.c` | sockets, plus another monotonic clock and ignoring SIGPIPE |
+    | polibtls `test/TestPeers.c`, copied as pogemini `test/Child.c` | runs a child process without a shell, waits for it, kills it |
+
+    So some of it is already written twice: the monotonic clock, and
+    the child-process helper. The lessons are scattered too: the
+    timestamp is made by hand because the first `gmtime_r` loads the
+    UTC zone with `tzload`, which needs more than 64 KiB of stack on
+    NetBSD and 32 KiB on OpenBSD, more than a task's stack, and
+    overran it.
+
+    **Proposed decisions** (for the user to accept or amend):
+
+    1. **`Platform` keeps voc's interface**, and gets no extension
+       module (`PlatformEx`). This is the same reasoning as
+       Directories (7e25bbb):
+       - its stated purpose is that a program written against voc's
+         `Platform` compiles unchanged;
+       - Stage 0 is built by voc against voc's own `Platform`;
+       - every module in `rtl/` has an implementation in `rtl/llvm`
+         and `rtl/vax`.
+
+       A single extension module would also mix services VMS can give
+       with ones it can't.
+    2. **Portable services become small `rtl` modules, one per concern**,
+       each with the same interface in `rtl/llvm` and `rtl/vax`, as
+       `Directories` is. poc's own source doesn't need them, so they
+       need no `rtl/voc` version unless that changes.
+    3. **Services that only make sense on Unix go in a library outside
+       poc**, a sibling of posockets, made when a second program needs
+       them. Its name is still to choose.
+
+    **Candidates for `rtl` (decision 2):**
+
+    - **A clock module** (name to choose, e.g. `Clock`). It would give:
+      - the monotonic clock, in ms and in µs;
+      - the time now, UTC, as fields and as ISO 8601 text
+        (`2026-11-16T12:34:56Z`).
+
+      It must be computed without `gmtime_r` or `localtime`, so that it
+      is safe on a task's stack (pogemini's `GemServer.now` already
+      does this, by Howard Hinnant's `civil_from_days`).
+      - **Users:** polibtls's and posockets' `now`, and pogemini's
+        timestamp.
+      - **Relation to `TaskWaiting.Now`:** it already has the
+        monotonic clock in µs, but it is "for Tasks only". Whether
+        `TaskWaiting` should call the new module, or keep its own, is
+        decided when it is written.
+      - **VAX/VMS:** the monotonic clock can come from `$GETTIM`, as
+        `rtl/vax/TaskWaiting` does. UTC needs a system call that gives
+        UTC rather than local time (`SYS$GETUTC`?); to be checked on
+        the guest.
+    - **Stop requests** (name to choose). It would catch the requests to
+      stop and let the program ask which came, 0 if none:
+      - on Unix, SIGTERM and SIGINT;
+      - on VMS, perhaps Ctrl-C or Ctrl-Y through an AST.
+
+      Each is caught only once, so that a second request ends the
+      program at once (pogemini's `SA_RESETHAND`).
+      - **Waking a task:** an option to post a `Tasks.Event` on a
+        request, so that a server waiting in `Tasks` learns of it at
+        once. Done through a procedure the program installs, so that
+        the module doesn't import `Tasks`.
+      - **Rules:** it follows the rules of "Threads and signal
+        handlers" (c67aad2) for what a handler may do.
+      - **Platform's interface stays:** `Platform.SetInterruptHandler`
+        (voc's, SIGINT only) is unchanged.
+      - **Users:** pogemini's `GemServer.catch` and `caught`.
+      - **VMS:** what VMS offers to match SIGTERM is to be found out.
+
+    **Candidates for the Unix library (decision 3):**
+    - becoming another user, all-or-nothing, with a check that root
+      can't be regained;
+    - running a child process with its arguments as a list, with no
+      shell and so no quoting, then waiting for it and killing it.
+      pogemini runs `openssl` through `Platform.System`, so through the
+      shell;
+    - `realpath`, opening with flags, a file's kind, whether a
+      descriptor is non-blocking.
+
+    Ignoring SIGPIPE stays in posockets, where it matters.
+
+    **To check first:** `Platform.GetClock` calls `localtime`
+    (`Platform.c`). Its first call in a task probably overruns a small
+    task stack on NetBSD and OpenBSD, as `gmtime_r` did in pogemini.
+    If it does, the fix belongs in "Ongoing bug fixing", whatever
+    becomes of this plan.
+
+    **Steps:**
+    1. Settle the decisions and the names with the user.
+    2. The clock module in `rtl/llvm` and `rtl/vax`, with:
+       - fixtures, including one that runs it in a 16 KiB task on the
+         BSD hosts;
+       - its `rtl/llvm/README.md` entry;
+       - the Reference Guide regenerated.
+    3. The stop-request module, the same way.
+    4. polibtls, posockets and pogemini move to them in their next
+       release. This raises the poc they need to the release that has
+       the modules, so do it when they need a new poc anyway.
+    5. The Unix library, as a project of its own, when the next program
+       needs one of its services.
+
 ## Ongoing language enhancements
 
 Language extensions that using poc on other programs shows are wanted,
