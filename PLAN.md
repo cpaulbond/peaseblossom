@@ -1336,6 +1336,25 @@ Those fixed while Phase 18 was current, 8-10, are in
     file an error, not the end. The status the read returns is still to
     be seen.
 
+21. **valgrind's memcheck can't follow a program's coroutines**. Found
+    2026-11-15 by posockets (`~/Repos/Oberon/posockets`), Phase 4, with
+    0.12.0 and valgrind 3.27.1 on Fedora 44 (x86-64): its `TestTasks`,
+    twenty connections served by tasks in one program, gave memcheck's
+    limit of 10,000,000 errors, and a program of two tasks that only
+    `Tasks.Yield`, with nothing of posockets, gave 23 from 15 contexts.
+    memcheck warns "client switching stacks?" at the switches, then
+    reports uninitialised values and invalid reads on the coroutine
+    stacks. `--max-stackframe` doesn't help. `CoroutinesNewStack`
+    (`rtl/llvm/Coroutines.c`) `mmap`s each stack and doesn't tell
+    valgrind it is one. A likely fix, not yet tried:
+    `VALGRIND_STACK_REGISTER(low, high)` there and
+    `VALGRIND_STACK_DEREGISTER` in `CoroutinesFreeStack`, from
+    `<valgrind/valgrind.h>` (a few instructions when not under
+    valgrind), behind `#ifdef` where the header may be missing. Until
+    then posockets runs its task tests under `valgrind --tool=none
+    --track-fds=yes`, for open descriptors only, so memcheck checks
+    nothing a task runs.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
