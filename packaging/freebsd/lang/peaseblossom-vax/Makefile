@@ -7,7 +7,7 @@
 # has the kits and the guide as text already. It is all text, so NO_ARCH.
 
 PORTNAME=	peaseblossom
-DISTVERSION=	0.12.0
+DISTVERSION=	0.13.0
 CATEGORIES=	lang
 MASTER_SITES=	https://github.com/tkurtbond/peaseblossom/releases/download/v${DISTVERSION}/
 PKGNAMESUFFIX=	-vax

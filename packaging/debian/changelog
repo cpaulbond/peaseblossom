@@ -1,3 +1,15 @@
+peaseblossom (0.13.0-1) unstable; urgency=medium
+
+  * Update to 0.13.0: Tasks' AwaitReadableFor and AwaitWritableFor, a
+    descriptor wait with a time limit, on both back ends; a second kit of
+    the VAX/VMS Guide's examples, POC-EXAMPLES-SOURCE, whose BUILD.COM
+    builds them with an installed poc and rebuilds what changed; Queens
+    and WordSets in both examples kits. The compiler is unchanged; only
+    the runtime libraries changed, and a library from an older poc must
+    be rebuilt.
+
+ -- T. Kurt Bond <tkurtbond@gmail.com>  Sun, 15 Nov 2026 19:28:41 -0500
+
 peaseblossom (0.12.0-1) unstable; urgency=medium
 
   * Update to 0.12.0: the runtime modules Coroutines and Tasks

@@ -25,7 +25,7 @@
 %global __provides_exclude_from ^%{_prefix}/lib/poc/.*$
 
 Name:           peaseblossom
-Version:        0.12.0
+Version:        0.13.0
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
@@ -110,6 +110,15 @@ test/install/check-vax.sh %{buildroot}%{_bindir}/poc %{_builddir}/check-install-
 %{_docdir}/%{name}-vax/
 
 %changelog
+* Sun Nov 15 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.13.0-1
+- Update to 0.13.0: Tasks' AwaitReadableFor and AwaitWritableFor, a
+  descriptor wait with a time limit, on both back ends; a second kit of
+  the VAX/VMS Guide's examples, POC-EXAMPLES-SOURCE, whose BUILD.COM
+  builds them with an installed poc and rebuilds what changed; Queens
+  and WordSets in both examples kits. The compiler is unchanged; only the
+  runtime libraries changed, and a library from an older poc must be
+  rebuilt.
+
 * Sat Nov 14 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.12.0-1
 - Update to 0.12.0: the runtime modules Coroutines (Oakwood's Init and
   Transfer, with Free and DefaultStackSize) and Tasks (cooperative tasks
