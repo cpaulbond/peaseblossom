@@ -25,7 +25,7 @@
 %global __provides_exclude_from ^%{_prefix}/lib/poc/.*$
 
 Name:           peaseblossom
-Version:        0.13.0
+Version:        0.13.1
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
@@ -111,6 +111,14 @@ test/install/check-vax.sh %{buildroot}%{_bindir}/poc %{_builddir}/check-install-
 %{_docdir}/%{name}-vax/
 
 %changelog
+* Mon Nov 16 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.13.1-1
+- Update to 0.13.1: coroutines and tasks under valgrind's memcheck, which
+  now follows a switch between two coroutines' stacks, since each stack
+  is registered with valgrind (rtl/llvm/valgrind.h, valgrind's own
+  header, licence bzip2-1.0.6, BSD-style). The compiler is unchanged;
+  only the runtime library changed, and a library from an older poc must
+  be rebuilt.
+
 * Sun Nov 15 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.13.0-1
 - Update to 0.13.0: Tasks' AwaitReadableFor and AwaitWritableFor, a
   descriptor wait with a time limit, on both back ends; a second kit of

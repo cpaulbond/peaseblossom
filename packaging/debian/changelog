@@ -1,3 +1,14 @@
+peaseblossom (0.13.1-1) unstable; urgency=medium
+
+  * Update to 0.13.1: coroutines and tasks under valgrind's memcheck,
+    which now follows a switch between two coroutines' stacks, since
+    each stack is registered with valgrind (rtl/llvm/valgrind.h,
+    valgrind's own header, licence bzip2-1.0.6, BSD-style). The
+    compiler is unchanged; only the runtime library changed, and a
+    library from an older poc must be rebuilt.
+
+ -- T. Kurt Bond <tkurtbond@gmail.com>  Mon, 16 Nov 2026 02:58:56 -0500
+
 peaseblossom (0.13.0-1) unstable; urgency=medium
 
   * Update to 0.13.0: Tasks' AwaitReadableFor and AwaitWritableFor, a
