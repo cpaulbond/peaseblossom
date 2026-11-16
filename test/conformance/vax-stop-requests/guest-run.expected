@@ -1,0 +1,6 @@
+build status: %X10000001
+before Catch: latest 0
+after Catch: latest 0
+after Catch again: latest 0
+done
+run status: %X00000001

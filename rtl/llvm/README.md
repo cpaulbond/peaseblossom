@@ -155,9 +155,16 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   waits by `Tasks.AwaitReadable(0)` while the others run, then reads by
   one `Platform.Read`; `O_NONBLOCK` is never set. A program reads
   standard input through `In` or through `TaskInput`, not both.
+- `StopRequests.Mod`, `StopRequests.c` - the requests to stop a program
+  catches to stop cleanly (PLAN.md, "Ongoing library enhancements", 7):
+  SIGINT and SIGTERM, each caught once (`SA_RESETHAND`), so that the next
+  ends the program; `Latest` tells which came last, and a notifier, run
+  in the handler and counted in `Platform.c`'s handlers running, may post
+  a `Tasks.Event`. The same interface as `rtl/vax/StopRequests.Mod`.
 
 Written in ordinary Oberon-2 over `SYSTEM.ADDRESS` (no pointer variables),
-except the C parts (`Platform.c`, `Coroutines.c`, `TaskWaiting.c`), so
+except the C parts (`Platform.c`, `Coroutines.c`, `TaskWaiting.c`,
+`StopRequests.c`), so
 poc compiles them itself; a program picks them up through the import
 path - the `llvm-gc-*` fixtures set `POC_IMPORT_PATH=../../../rtl/llvm`.
 Sources use the `.Mod` spelling; `ReadModuleSource` finds either.

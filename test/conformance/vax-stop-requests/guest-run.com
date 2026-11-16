@@ -1,0 +1,28 @@
+$ ! vax-stop-requests (PLAN.md, "Ongoing library enhancements", 7): poc's
+$ ! runtime is assembled; STOPVAX.COM, which poc -build wrote, links the
+$ ! program, and it runs, its SYS$ERROR, where a trap's message goes, a
+$ ! file shown after the run. Everything made is deleted
+$ SET NOON
+$ MACRO/OBJECT POCRTL.MAR
+$ S = $STATUS
+$ IF S THEN @STOPVAX
+$ IF S THEN S = $STATUS
+$ WRITE SYS$OUTPUT "build status: ", S
+$ IF .NOT. S THEN GOTO CLEAN
+$ DEFINE/USER_MODE SYS$ERROR STOPVAX.ERR
+$ RUN STOPVAX
+$ WRITE SYS$OUTPUT "run status: ", $STATUS
+$ IF F$SEARCH("STOPVAX.ERR") .NES. "" THEN TYPE STOPVAX.ERR
+$ IF F$SEARCH("STOPVAX.ERR") .NES. "" THEN DELETE/NOLOG STOPVAX.ERR;*
+$CLEAN:
+$ I = 0
+$NEXT_OBJECT:
+$ M = F$ELEMENT(I, ",", "POCRTL,STOPVAX,STOPREQUESTS,PLATFORM,OUT,LINEOUTPUT,FORMATTEDOUTPUT,FORMATTEDTEXT,REALDIGITS")
+$ IF M .EQS. "," THEN GOTO DONE
+$ IF F$SEARCH("''M'.OBJ") .NES. "" THEN DELETE/NOLOG 'M'.OBJ;*
+$ I = I + 1
+$ GOTO NEXT_OBJECT
+$DONE:
+$ IF F$SEARCH("STOPVAX.OPT") .NES. "" THEN DELETE/NOLOG STOPVAX.OPT;*
+$ IF F$SEARCH("STOPVAX.EXE") .NES. "" THEN DELETE/NOLOG STOPVAX.EXE;*
+$ EXIT 1

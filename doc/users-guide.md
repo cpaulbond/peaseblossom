@@ -709,6 +709,7 @@ from voc's, its source's first comment says how.
 | `GarbageCollectedHeap` | the collector: `Collect`, statistics, and finalizers |
 | `Coroutines` | coroutines: `Init`, `Transfer`, `Free` (section 11) |
 | `Tasks`, `TaskInput` | tasks over coroutines, with channels, and standard input read by a task (section 12) |
+| `StopRequests` | catching the requests to stop (SIGINT and SIGTERM, each once) to stop cleanly: `Catch`, `Latest`, and a notifier that may post a `Tasks.Event` (poc's own) |
 
 Each example below is in `doc/examples/runtime`.
 

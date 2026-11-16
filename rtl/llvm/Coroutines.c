@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 #include <sys/mman.h>
 #include "valgrind.h"
@@ -202,10 +203,24 @@ uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintp
 uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintptr_t *high,
                              uintptr_t *valgrind_id)
 {
+  static int zones_loaded = 0;
   size_t page = (size_t)sysconf(_SC_PAGESIZE), usable, total;
   int flags = MAP_PRIVATE | MAP_ANON;
   char *memory;
   uintptr_t *top;
+  /* libc loads the local time zone, and on NetBSD the UTC one too, on
+     its first localtime or gmtime, reading the zone file into buffers on
+     the stack: more than 32 KiB on NetBSD amd64 and OpenBSD i386, so
+     that Platform.GetClock's first call in a 16 KiB coroutine overran
+     it (PLAN.md, "Ongoing bug fixing", 24). The first stack is made from
+     main's, so they are loaded here, while there is room; later calls
+     use what was loaded, unless TZ changes. */
+  if (!zones_loaded) {
+    time_t epoch = 0;
+    (void)localtime(&epoch);
+    (void)gmtime(&epoch);
+    zones_loaded = 1;
+  }
   if (size < 0) size = 0;
   if ((uint64_t)size > (uint64_t)(SIZE_MAX / 2)) return 0;
   usable = ((size_t)size + page - 1) / page * page;

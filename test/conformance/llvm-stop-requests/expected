@@ -1,0 +1,14 @@
+== -O2
+before Catch: latest 0, notified 0
+woken by SIGINT: latest 1, notified 1
+after SIGTERM: latest 2, notified 2
+after Catch and SIGINT: latest 1, notified 3
+after SetNotifier(NIL), Catch and SIGINT: latest 1, notified 3
+exit=130
+== -OC
+before Catch: latest 0, notified 0
+woken by SIGINT: latest 1, notified 1
+after SIGTERM: latest 2, notified 2
+after Catch and SIGINT: latest 1, notified 3
+after SetNotifier(NIL), Catch and SIGINT: latest 1, notified 3
+exit=130

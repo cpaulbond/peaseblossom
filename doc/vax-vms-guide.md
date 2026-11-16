@@ -711,6 +711,7 @@ has, described at the end of this chapter.
 | `Coroutines` | `LIB$GET_VM_PAGE`, `$SETPRT`, `COROUTINESWITCH.MAR` | Smaller stacks, counted against the paging file quota whole. |
 | `Tasks` | `Coroutines`, `$HIBER`, `$WAKE`, `$SETIMR`, `EXE$GL_ABSTIM_TICS` | An AST posts, not a signal handler. No `AwaitReadable` or `AwaitWritable`, timed or not. |
 | `TaskInput` | `$ASSIGN`, `$QIO`, `Platform.Read` | A terminal or mailbox is read a record at a time; a file stops every task. |
+| `StopRequests` | `Platform.SetInterruptHandler` | Only CTRL/C at `SYS$COMMAND`, `interrupt`; never `terminate`. The notifier runs at AST level. |
 
 ### Files
 

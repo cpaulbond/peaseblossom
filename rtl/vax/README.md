@@ -195,3 +195,8 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   prompt and lets lines written meanwhile break through it. Anything else
   (a disk file, a batch job's input, `NL:`) is read by `Platform.Read`, as
   `In` reads, and every task waits while RMS reads.
+- `StopRequests.Mod` - `rtl/llvm/StopRequests.Mod`'s interface (PLAN.md,
+  "Ongoing library enhancements", 7) over `Platform.SetInterruptHandler`:
+  CTRL/C at `SYS$COMMAND` is `interrupt`, caught once, after which CTRL/C
+  acts as CTRL/Y again; the notifier runs at AST level. `terminate` is
+  never reported.

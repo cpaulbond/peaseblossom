@@ -51,6 +51,8 @@ lib/poc/${POC_TRIPLE}/O2-g/RealDigits.owner
 lib/poc/${POC_TRIPLE}/O2-g/RealDigits.sym
 lib/poc/${POC_TRIPLE}/O2-g/Reals.owner
 lib/poc/${POC_TRIPLE}/O2-g/Reals.sym
+lib/poc/${POC_TRIPLE}/O2-g/StopRequests.owner
+lib/poc/${POC_TRIPLE}/O2-g/StopRequests.sym
 lib/poc/${POC_TRIPLE}/O2-g/Strings.owner
 lib/poc/${POC_TRIPLE}/O2-g/Strings.sym
 lib/poc/${POC_TRIPLE}/O2-g/TaskInput.owner
@@ -114,6 +116,8 @@ lib/poc/${POC_TRIPLE}/O2/RealDigits.owner
 lib/poc/${POC_TRIPLE}/O2/RealDigits.sym
 lib/poc/${POC_TRIPLE}/O2/Reals.owner
 lib/poc/${POC_TRIPLE}/O2/Reals.sym
+lib/poc/${POC_TRIPLE}/O2/StopRequests.owner
+lib/poc/${POC_TRIPLE}/O2/StopRequests.sym
 lib/poc/${POC_TRIPLE}/O2/Strings.owner
 lib/poc/${POC_TRIPLE}/O2/Strings.sym
 lib/poc/${POC_TRIPLE}/O2/TaskInput.owner
@@ -179,6 +183,8 @@ lib/poc/${POC_TRIPLE}/OC-g/RealDigits.owner
 lib/poc/${POC_TRIPLE}/OC-g/RealDigits.sym
 lib/poc/${POC_TRIPLE}/OC-g/Reals.owner
 lib/poc/${POC_TRIPLE}/OC-g/Reals.sym
+lib/poc/${POC_TRIPLE}/OC-g/StopRequests.owner
+lib/poc/${POC_TRIPLE}/OC-g/StopRequests.sym
 lib/poc/${POC_TRIPLE}/OC-g/Strings.owner
 lib/poc/${POC_TRIPLE}/OC-g/Strings.sym
 lib/poc/${POC_TRIPLE}/OC-g/TaskInput.owner
@@ -242,6 +248,8 @@ lib/poc/${POC_TRIPLE}/OC/RealDigits.owner
 lib/poc/${POC_TRIPLE}/OC/RealDigits.sym
 lib/poc/${POC_TRIPLE}/OC/Reals.owner
 lib/poc/${POC_TRIPLE}/OC/Reals.sym
+lib/poc/${POC_TRIPLE}/OC/StopRequests.owner
+lib/poc/${POC_TRIPLE}/OC/StopRequests.sym
 lib/poc/${POC_TRIPLE}/OC/Strings.owner
 lib/poc/${POC_TRIPLE}/OC/Strings.sym
 lib/poc/${POC_TRIPLE}/OC/TaskInput.owner

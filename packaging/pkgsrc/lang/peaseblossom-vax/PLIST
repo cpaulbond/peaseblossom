@@ -730,6 +730,9 @@ lib/poc/vax-dec-vms/O2/SYIDEF.sym
 lib/poc/vax-dec-vms/O2/SortMerge.mar
 lib/poc/vax-dec-vms/O2/SortMerge.owner
 lib/poc/vax-dec-vms/O2/SortMerge.sym
+lib/poc/vax-dec-vms/O2/StopRequests.mar
+lib/poc/vax-dec-vms/O2/StopRequests.owner
+lib/poc/vax-dec-vms/O2/StopRequests.sym
 lib/poc/vax-dec-vms/O2/Strings.mar
 lib/poc/vax-dec-vms/O2/Strings.owner
 lib/poc/vax-dec-vms/O2/Strings.sym
@@ -1605,6 +1608,9 @@ lib/poc/vax-dec-vms/OC/SYIDEF.sym
 lib/poc/vax-dec-vms/OC/SortMerge.mar
 lib/poc/vax-dec-vms/OC/SortMerge.owner
 lib/poc/vax-dec-vms/OC/SortMerge.sym
+lib/poc/vax-dec-vms/OC/StopRequests.mar
+lib/poc/vax-dec-vms/OC/StopRequests.owner
+lib/poc/vax-dec-vms/OC/StopRequests.sym
 lib/poc/vax-dec-vms/OC/Strings.mar
 lib/poc/vax-dec-vms/OC/Strings.owner
 lib/poc/vax-dec-vms/OC/Strings.sym

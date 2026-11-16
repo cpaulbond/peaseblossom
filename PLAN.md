@@ -1516,6 +1516,23 @@ Those fixed while Phase 18 was current, 8-10, are in
     where strace can inject faults, and skips it, saying so, elsewhere.
     VMS has no EINTR, so `rtl/vax/TaskInput.Mod` is unchanged.
 
+24. **`Platform.GetClock`'s first call overruns a small task stack on
+    NetBSD amd64 and OpenBSD i386** [fixed]. Found 2026-11-16, checking
+    first for "Ongoing library enhancements" 7. `PlatformGetClock` calls
+    `localtime`, and libc loads the local time zone on the first
+    `localtime` or `gmtime` of the process (on NetBSD the UTC zone too,
+    on `gmtime`), reading the zone file into buffers on the stack. Probes
+    of one `GetClock` in a task of each size found that NetBSD amd64 and
+    OpenBSD i386 need more than 32 KiB, and 48 KiB is enough; a 16 KiB
+    task, the least, overran its guard page (SIGSEGV). It was the same as
+    pogemini's `gmtime_r`. A `GetClock` on the main stack first avoided
+    it. Fixed the same day: `CoroutinesNewStack` (`rtl/llvm/Coroutines.c`)
+    calls `localtime` and `gmtime` once, before the first coroutine
+    stack is made, so still on main's stack; later calls reuse what was
+    loaded, unless `TZ` changes. The fixture `llvm-tasks-clock` calls
+    `GetClock` first in a 16 KiB task, with the local zone and with
+    `TZ=Europe/London`.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
@@ -1577,8 +1594,9 @@ Those done while Phase 15 was current, 1 and 2, are in
 7.  System services beyond voc's `Platform` (the user, 2026-11-16, after
     pogemini's rc scripts). A plan: its decisions were accepted by the
     user on 2026-11-16, and revised the same day once poDateTime was
-    found to have the clocks; the names are still to choose, and
-    nothing is done yet.
+    found to have the clocks. The names were chosen by the user on
+    2026-11-16: `StopRequests` for the module and **pounix** for the
+    Unix library. Steps 1 and 2 are done; 3 and 4 are later.
 
     **Why.** The programs built on poc so far each carry C for the same
     operating-system services, because poc can't name `struct stat`,
@@ -1622,7 +1640,7 @@ Those done while Phase 15 was current, 1 and 2, are in
        left for `rtl`.
     3. **Services that only make sense on Unix go in a library outside
        poc**, a sibling of posockets, made when a second program needs
-       them. Its name is still to choose.
+       them. It is to be called pounix (the user, 2026-11-16).
 
     **Clocks: poDateTime, not `rtl`** (revised 2026-11-16). A clock
     module was first proposed for `rtl`. poDateTime
@@ -1655,8 +1673,8 @@ Those done while Phase 15 was current, 1 and 2, are in
     (`clock_gettime`, no `localtime`); `TimeStrings`' stack use is not
     yet measured.
 
-    **Candidate for `rtl` (decision 2): stop requests** (name to
-    choose). It would catch the requests to stop and let the program
+    **Candidate for `rtl` (decision 2): stop requests**, now
+    `StopRequests` (done; below). It would catch the requests to stop and let the program
     ask which came, 0 if none:
     - on Unix, SIGTERM and SIGINT;
     - on VMS, perhaps Ctrl-C or Ctrl-Y through an AST.
@@ -1690,16 +1708,40 @@ Those done while Phase 15 was current, 1 and 2, are in
     (`Platform.c`). Its first call in a task probably overruns a small
     task stack on NetBSD and OpenBSD, as `gmtime_r` did in pogemini.
     If it does, the fix belongs in "Ongoing bug fixing", whatever
-    becomes of this plan.
+    becomes of this plan. Checked 2026-11-16: it does, on NetBSD amd64
+    and OpenBSD i386; that is "Ongoing bug fixing" 24, fixed.
 
     **Steps:**
     1. Choose the names with the user: the stop-request module and the
-       Unix library.
+       Unix library. [done: `StopRequests` and pounix, 2026-11-16]
     2. The stop-request module in `rtl/llvm` and `rtl/vax`, with:
        - fixtures, including one that runs it in a 16 KiB task on the
          BSD hosts;
        - its `rtl/llvm/README.md` entry;
        - the Reference Guide regenerated.
+
+       [done 2026-11-16] `StopRequests`: `none`, `interrupt`,
+       `terminate`, `Catch`, `Latest` and `SetNotifier(Notifier)`, a
+       `PROCEDURE` called from the handler, which may post a
+       `Tasks.Event`.
+       - **On Unix** (`StopRequests.c`), `Catch` installs a handler for
+         SIGINT and SIGTERM with `SA_RESTART | SA_RESETHAND`, each
+         blocking both, and counts the notifier in `Platform.c`'s
+         `handlers-running`, so a `Transfer` in it traps as in
+         `Platform`'s handlers. It replaces a SIGINT handler
+         `Platform.SetInterruptHandler` set, and the reverse.
+       - **On VMS** it is `Platform.SetInterruptHandler` with its own
+         handler, which takes itself away, so the next CTRL/C acts as
+         CTRL/Y. `terminate` is never reported there: what matches
+         SIGTERM on VMS is still to be found out.
+       - **Fixtures:** `llvm-stop-requests` raises SIGINT from a 16 KiB
+         task, waking another awaiting the posted event, then SIGTERM,
+         SIGINT after `Catch` again, and the SIGINT after that, which
+         ends the program (status 130); under `-O2` and `-OC`.
+         `vax-stop-requests` runs on the guest over telnet, so with the
+         AST armed on a terminal. Nothing there types CTRL/C, so it
+         checks only that `Latest` stays `none` and the program ends
+         normally. A caught CTRL/C on VMS is not yet tested.
     3. polibtls, posockets and pogemini move to poDateTime's clocks
        (after the 16 KiB check above) and to the stop-request module
        in their next release. This raises the poc they need to the
