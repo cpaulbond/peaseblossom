@@ -329,6 +329,13 @@ run on atla and rackhir, and its figures are compared with 8.2's.
 
 Done 2026-11-13 (`78574b8`); rackhir runs at the plan's end.
 
+Added 2026-11-15 (`PLAN.md`, "Ongoing bug fixing" 21): each stack is
+registered with valgrind (`VALGRIND_STACK_REGISTER` in `NewStack`, its id
+kept in the descriptor for `FreeStack`'s `VALGRIND_STACK_DEREGISTER`;
+`rtl/llvm/valgrind.h`), since memcheck took a switch between two
+neighbouring stacks for a push or a pop. `doc/developer/coroutines-under-valgrind.md`
+has the account; the fixture is `llvm-coroutines-valgrind`.
+
 The figures (2026-11-14; rackhir's two runs, at `-opt 2`, with the stage 1
 runtime; atla's collections from one run), against 8.2's for the
 prototype. rackhir is emulated, so only its ratios mean anything:

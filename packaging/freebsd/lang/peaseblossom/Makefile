@@ -11,8 +11,14 @@ MAINTAINER=	tkurtbond@gmail.com
 COMMENT=	Oberon-2 compiler (poc) using LLVM
 WWW=		https://github.com/tkurtbond/peaseblossom
 
-LICENSE=	BSD3CLAUSE
-LICENSE_FILE=	${WRKSRC}/LICENSE
+LICENSE=	BSD3CLAUSE BZIP2
+LICENSE_COMB=	multi
+# rtl/llvm/valgrind.h, valgrind's, under bzip2's licence (BSD-style), whose
+# text is the header's first comment
+LICENSE_NAME_BZIP2=	BZIP2 license (BSD-style; rtl/llvm/valgrind.h)
+LICENSE_FILE_BSD3CLAUSE=	${WRKSRC}/LICENSE
+LICENSE_FILE_BZIP2=	${WRKSRC}/rtl/llvm/valgrind.h
+LICENSE_PERMS_BZIP2=	dist-mirror dist-sell pkg-mirror pkg-sell auto-accept
 
 # poc has run on amd64 (alerik) and aarch64 (rackhir); it compiles and
 # links every program with base clang, so it needs nothing else

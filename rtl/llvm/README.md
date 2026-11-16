@@ -126,7 +126,16 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   while suspended. The C part has the context switch and the first frame's
   trampoline for x86-64, i386 and arm64, the stacks, and the traps' texts
   (16-18). `Platform.c` counts the signal handlers running, so that
-  `Transfer` in one traps.
+  `Transfer` in one traps. Each stack is registered with valgrind, so that memcheck
+  can follow a switch between two of them
+  (`doc/developer/coroutines-under-valgrind.md`).
+- `valgrind.h` - valgrind 3.27.1's, unchanged (its own BSD-style licence,
+  for this one file), for `Coroutines.c`'s `VALGRIND_STACK_REGISTER` and
+  `VALGRIND_STACK_DEREGISTER`: macros only, a few instructions that change
+  nothing when the program is not run under valgrind, and their default
+  value alone on OpenBSD and NetBSD. A later valgrind's copy can replace
+  it. `make` rebuilds `poc-rtl` when it changes, and poc recompiles
+  `Coroutines.c` through clang's dependency file.
 - `Tasks.Mod` - cooperative tasks over `Coroutines`
   (`doc/developer/tasks.md`): a task is an extension of `TaskDesc` with
   an exported `Run`; a FIFO run queue, `Yield`, `Join`, Mesa conditions,

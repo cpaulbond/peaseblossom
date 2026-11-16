@@ -134,14 +134,20 @@ per architecture, carry it.
    `CoroutinesFreeStack`, with the id in the descriptor. A comment says
    why: memcheck takes a switch between neighbouring stacks for a push or
    a pop.
-3. **A fixture**, `coroutines-valgrind`: the two-task program and `Primes`
+3. **A fixture**, `llvm-coroutines-valgrind`: the two-task program and `Primes`
    under memcheck (`--error-exitcode`), expecting 0 errors; where valgrind
    is missing it prints the same expected output and says it skipped, so
    it passes on OpenBSD and NetBSD (`testresult.sh`, as every fixture).
    atla, alerik and rackhir run it for real if valgrind is installed
-   there.
+   there (on 2026-11-15 only atla had it).
 4. **The documents.** `doc/developer/coroutines.md` and the User's Guide's
    chapter on coroutines: a program using coroutines or tasks can be run
    under memcheck.
 5. **posockets** runs its task tests under memcheck again, in place of
    `--tool=none --track-fds=yes`.
+
+Steps 1-4 were done on 2026-11-15. The fixture runs the two-task
+program, `Primes 50` and `Queens -n 6 4` natively and under memcheck, with
+0 errors from each; built against the runtime without the registration it
+fails, memcheck exiting with `--error-exitcode`'s status. Step 5 is
+posockets' own.

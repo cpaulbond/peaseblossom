@@ -24,6 +24,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/mman.h>
+#include "valgrind.h"
 
 #define NAME(n) __asm__("Coroutines.-" n)
 
@@ -193,10 +194,13 @@ extern char coroutines_start[] __asm__("Coroutines.-start") __attribute__((visib
 
 /* A stack of size bytes, rounded up to whole pages, above a guard page
    that is not counted, holding a first frame that calls body: its bounds
-   in *low and *high, and the stack pointer for the switch to resume; 0
-   when the system refuses the memory, or the size does not fit. */
-uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintptr_t *high) NAME("new-stack");
-uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintptr_t *high)
+   in *low and *high, valgrind's id for it in *valgrind_id, and the stack
+   pointer for the switch to resume; 0 when the system refuses the memory,
+   or the size does not fit. */
+uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintptr_t *high,
+                             uintptr_t *valgrind_id) NAME("new-stack");
+uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintptr_t *high,
+                             uintptr_t *valgrind_id)
 {
   size_t page = (size_t)sysconf(_SC_PAGESIZE), usable, total;
   int flags = MAP_PRIVATE | MAP_ANON;
@@ -219,14 +223,26 @@ uintptr_t CoroutinesNewStack(uintptr_t body, int64_t size, uintptr_t *low, uintp
   first_frame(top, body, (uintptr_t)coroutines_start);
   *low = (uintptr_t)(memory + page);
   *high = (uintptr_t)top;
+  /* Tells valgrind, when the program runs under it, that this is a stack.
+     memcheck takes a move of the stack pointer of less than
+     --max-stackframe (2 MB) for a push or a pop, and mmap puts the
+     stacks next to each other, so a switch from one coroutine to
+     another would make the other's stack undefined or inaccessible
+     (doc/developer/coroutines-under-valgrind.md). A move into a
+     registered stack is always a switch. Run natively, this is a few
+     instructions that change nothing, and the id is 0; on OpenBSD and
+     NetBSD valgrind.h makes it 0 alone. */
+  *valgrind_id = VALGRIND_STACK_REGISTER(memory + page, memory + total);
   return (uintptr_t)(top - FRAME_WORDS);
 }
 
-/* Gives back a stack CoroutinesNewStack made, its guard page with it. */
-void CoroutinesFreeStack(uintptr_t low, uintptr_t high) NAME("free-stack");
-void CoroutinesFreeStack(uintptr_t low, uintptr_t high)
+/* Gives back a stack CoroutinesNewStack made, its guard page with it, and
+   tells valgrind it is no longer a stack. */
+void CoroutinesFreeStack(uintptr_t low, uintptr_t high, uintptr_t valgrind_id) NAME("free-stack");
+void CoroutinesFreeStack(uintptr_t low, uintptr_t high, uintptr_t valgrind_id)
 {
   size_t page = (size_t)sysconf(_SC_PAGESIZE);
+  VALGRIND_STACK_DEREGISTER((unsigned)valgrind_id);
   munmap((char *)low - page, (size_t)(high - low) + page);
 }
 

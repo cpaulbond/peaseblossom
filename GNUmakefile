@@ -29,8 +29,9 @@ VAX_VMS_SRCS := $(wildcard src/back/vax/vms/*.Mod)
 # changed, so only then is poc rebuilt)
 BUILD_INFO := $(BUILD_DIR)/gen/BuildInfo.Mod
 RTL_SRCS := $(wildcard rtl/llvm/*.Mod)
-# Phase 12 step 5a: the C part of an rtl module, compiled with it by poc
-RTL_C_SRCS := $(wildcard rtl/llvm/*.c)
+# Phase 12 step 5a: the C part of an rtl module, compiled with it by poc, and
+# the headers it includes (valgrind.h, for Coroutines.c)
+RTL_C_SRCS := $(wildcard rtl/llvm/*.c) $(wildcard rtl/llvm/*.h)
 # what Stage 0 builds with voc besides src/: Err and what it needs (Phase 11
 # D11), Directories (Phase 16 step 4), and the collector's census
 # (doc/developer/vms-memory.md, step 1b)

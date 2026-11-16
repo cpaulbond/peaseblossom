@@ -1486,6 +1486,11 @@ its frames can be seen only once it is resumed. On VAX/VMS a traceback,
 or the debugger's `SHOW CALLS`, ends at `POC_COROUTINE_START` in the same
 way.
 
+A program using coroutines, or tasks, can be run under valgrind's memcheck
+on Linux and FreeBSD: each coroutine's stack is registered with valgrind,
+so memcheck follows a switch from one to another. Run natively, the
+registration costs a few instructions per stack.
+
 ## 12. Tasks
 
 A task is a coroutine that the module `Tasks` schedules for you: instead

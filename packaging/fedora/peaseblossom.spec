@@ -29,7 +29,8 @@ Version:        0.13.0
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
-License:        BSD-3-Clause
+# rtl/llvm/valgrind.h, compiled into poc-rtl's Coroutines, is bzip2-1.0.6 (BSD-style)
+License:        BSD-3-Clause AND bzip2-1.0.6
 URL:            https://github.com/tkurtbond/peaseblossom
 Source0:        %{url}/releases/download/v%{version}/%{name}-%{version}.tar.gz
 

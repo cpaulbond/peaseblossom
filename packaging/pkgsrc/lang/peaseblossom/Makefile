@@ -12,7 +12,9 @@ GITHUB_RELEASE=	v${PKGVERSION_NOREV}
 MAINTAINER=	tkurtbond@gmail.com
 HOMEPAGE=	https://github.com/tkurtbond/peaseblossom
 COMMENT=	Oberon-2 compiler (poc) using LLVM
-LICENSE=	modified-bsd
+# zlib for rtl/llvm/valgrind.h, valgrind's, under bzip2's licence
+# (BSD-style), which pkgsrc's archivers/bzip2 lists as zlib
+LICENSE=	modified-bsd AND zlib
 
 # poc has run on amd64 (artos, terhali) and i386 (yishana)
 ONLY_FOR_PLATFORM=	NetBSD-*-x86_64 NetBSD-*-i386

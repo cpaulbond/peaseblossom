@@ -1380,7 +1380,7 @@ Those fixed while Phase 18 was current, 8-10, are in
     file an error, not the end. The status the read returns is still to
     be seen.
 
-21. **valgrind's memcheck can't follow a program's coroutines**. Found
+21. **[fixed] valgrind's memcheck can't follow a program's coroutines**. Found
     2026-11-15 by posockets (`~/Repos/Oberon/posockets`), Phase 4, with
     0.12.0 and valgrind 3.27.1 on Fedora 44 (x86-64): its `TestTasks`,
     twenty connections served by tasks in one program, gave memcheck's
@@ -1402,7 +1402,9 @@ Those fixed while Phase 18 was current, 8-10, are in
     neighbouring coroutine stacks is taken for a push or a pop;
     registering the stacks, tried, leaves 0 errors. The plan copies
     `valgrind.h` into `rtl/llvm` and keeps each stack's id in its
-    descriptor.
+    descriptor. Fixed 2026-11-15 so, with the fixture
+    `llvm-coroutines-valgrind` (0 errors from the two-task program,
+    `Primes 50` and `Queens`; skipped where there is no valgrind).
 
 ## Ongoing library enhancements
 

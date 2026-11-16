@@ -325,6 +325,8 @@ test/conformance/llvm-coroutines-traps/*.exe
 test/conformance/llvm-coroutines-overflow/*.exe
 test/conformance/llvm-coroutines-c-callback/llvm-coroutines-c-callback
 test/conformance/llvm-coroutines-unwind/work/
+test/conformance/llvm-coroutines-valgrind/*.exe
+test/conformance/llvm-coroutines-valgrind/valgrind.log
 test/conformance/llvm-tasks/llvm-tasks
 test/conformance/llvm-tasks/llvm-tasks-oc
 test/conformance/llvm-tasks-channels/llvm-tasks-channels

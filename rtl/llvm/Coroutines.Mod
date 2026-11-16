@@ -68,11 +68,12 @@ MODULE Coroutines;
   TYPE
     Body* = PROCEDURE;
     (* a stack: the stack pointer it was left with, its bounds (low is 0
-       for the main program's), its state, and its place in the list of
-       the stacks not freed *)
+       for the main program's), valgrind's id for it (Coroutines.c's
+       CoroutinesNewStack), its state, and its place in the list of the
+       stacks not freed *)
     Descriptor = POINTER TO DescriptorRecord;
     DescriptorRecord = RECORD
-      sp, low, high: SYSTEM.ADDRESS;
+      sp, low, high, valgrindStack: SYSTEM.ADDRESS;
       state: INTEGER;
       next, previous: Descriptor
     END;
@@ -84,8 +85,8 @@ MODULE Coroutines;
     current: Descriptor;
 
   PROCEDURE ["C", "Coroutines.-new-stack"] NewStack(body: SYSTEM.ADDRESS; size: HUGEINT;
-    VAR low, high: SYSTEM.ADDRESS): SYSTEM.ADDRESS;
-  PROCEDURE ["C", "Coroutines.-free-stack"] FreeStack(low, high: SYSTEM.ADDRESS);
+    VAR low, high, valgrindStack: SYSTEM.ADDRESS): SYSTEM.ADDRESS;
+  PROCEDURE ["C", "Coroutines.-free-stack"] FreeStack(low, high, valgrindStack: SYSTEM.ADDRESS);
   PROCEDURE ["C", "Coroutines.-switch"] Switch(VAR from: SYSTEM.ADDRESS; to: SYSTEM.ADDRESS);
   PROCEDURE ["C", "Coroutines.-misuse"] Misuse(which: SYSTEM.INT32);
   PROCEDURE ["C", "Coroutines.-no-stack"] NoStack;
@@ -101,7 +102,7 @@ MODULE Coroutines;
     NEW(descriptor);
     IF descriptor = NIL THEN NoStack END;
     descriptor.sp := NewStack(SYSTEM.VAL(SYSTEM.ADDRESS, body), size,
-      descriptor.low, descriptor.high);
+      descriptor.low, descriptor.high, descriptor.valgrindStack);
     IF descriptor.sp = 0 THEN NoStack END;
     descriptor.state := new;
     descriptor.previous := mainCoroutine;
@@ -150,7 +151,7 @@ MODULE Coroutines;
       IF descriptor = current THEN Misuse(freeOfRunning)
       ELSIF descriptor = mainCoroutine THEN Misuse(freeOfMain)
       END;
-      FreeStack(descriptor.low, descriptor.high);
+      FreeStack(descriptor.low, descriptor.high, descriptor.valgrindStack);
       descriptor.state := freed;
       descriptor.previous.next := descriptor.next;
       IF descriptor.next # NIL THEN descriptor.next.previous := descriptor.previous END;
