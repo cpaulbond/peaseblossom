@@ -1406,6 +1406,22 @@ Those fixed while Phase 18 was current, 8-10, are in
     `llvm-coroutines-valgrind` (0 errors from the two-task program,
     `Primes 50` and `Queens`; skipped where there is no valgrind).
 
+22. **Tasks' deadlines on VAX/VMS move when the clock is set**. Found
+    2026-11-16, planning "Ongoing library enhancements" 7 with the user.
+    `rtl/vax/TaskWaiting.Now` reads `$GETTIM`, the system clock, which
+    on VMS 5.5-2 is local time, set with `$SETIME` at the changes of
+    daylight saving time (on the user's production VAX, every night
+    from a NIST time server). `Tasks` measures its deadlines and timers
+    with `Now` (`rtl/vax/Tasks.Mod`), so when the clock is set back an
+    hour a deadline comes an hour late, and set forward, an hour early;
+    `Wait`'s own `$SETIMR` is a delta time and is not affected. The fix
+    is poDateTime's (its Q8, `src/vax/TimePlatform.Mod`): read
+    `EXE$GL_ABSTIM_TICS`, the 10 ms ticks since boot, through
+    `SYS.STB`, counting its wraps every 497 days. How POCRTL, or a
+    program using `Tasks`, gets linked with `SYS.STB` is part of the
+    fix. A fixture can't set the guest's clock unprivileged, so it
+    checks only that `Now` never decreases and follows elapsed time.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
@@ -1465,7 +1481,10 @@ Those done while Phase 15 was current, 1 and 2, are in
     and `llvm-tasks-traps`' cases 17 and 18.
 
 7.  System services beyond voc's `Platform` (the user, 2026-11-16, after
-    pogemini's rc scripts). A plan; nothing is decided or done yet.
+    pogemini's rc scripts). A plan: its decisions were accepted by the
+    user on 2026-11-16, and revised the same day once poDateTime was
+    found to have the clocks; the names are still to choose, and
+    nothing is done yet.
 
     **Why.** The programs built on poc so far each carry C for the same
     operating-system services, because poc can't name `struct stat`,
@@ -1488,7 +1507,7 @@ Those done while Phase 15 was current, 1 and 2, are in
     NetBSD and 32 KiB on OpenBSD, more than a task's stack, and
     overran it.
 
-    **Proposed decisions** (for the user to accept or amend):
+    **Decisions** (accepted by the user 2026-11-16):
 
     1. **`Platform` keeps voc's interface**, and gets no extension
        module (`PlatformEx`). This is the same reasoning as
@@ -1503,49 +1522,63 @@ Those done while Phase 15 was current, 1 and 2, are in
        with ones it can't.
     2. **Portable services become small `rtl` modules, one per concern**,
        each with the same interface in `rtl/llvm` and `rtl/vax`, as
-       `Directories` is. poc's own source doesn't need them, so they
-       need no `rtl/voc` version unless that changes.
+       `Directories` is, **unless a library already gives them**. poc's
+       own source doesn't need them, so they need no `rtl/voc` version
+       unless that changes. Of the candidates, only stop requests are
+       left for `rtl`.
     3. **Services that only make sense on Unix go in a library outside
        poc**, a sibling of posockets, made when a second program needs
        them. Its name is still to choose.
 
-    **Candidates for `rtl` (decision 2):**
+    **Clocks: poDateTime, not `rtl`** (revised 2026-11-16). A clock
+    module was first proposed for `rtl`. poDateTime
+    (`~/Repos/Oberon/poDateTime`, all six steps done, on Linux, the
+    BSDs and VAX/VMS 5.5-2) already has one: `Clocks.Monotonic`,
+    `Clocks.Now` as an `Instant`, and `TimeStrings`' ISO 8601 and RFC
+    3339 forms. So polibtls, posockets and pogemini take poDateTime
+    as a dependency instead, in place of their own monotonic clocks
+    and pogemini's hand-made timestamp. Its design
+    (`doc/date-time-design.md`) settled the VAX's side, which the user
+    confirmed from the production VAX they maintain:
+    - **VAX/VMS 5.5-2 has no UTC** (Q7, Q22). The system clock is local
+      time, set with `$SETIME` at the changes of daylight saving time
+      (on the user's VAX, every night from a NIST time server); there
+      is no `SYS$TIMEZONE_DIFFERENTIAL`. `Clocks.Now` turns local time
+      into UTC through the `TZ` logical's POSIX rule, or, without one,
+      `Fixed(0)`, when `Now` is really local time.
+    - **The monotonic clock is `EXE$GL_ABSTIM_TICS`** (Q8), 10 ms ticks
+      since boot, read through `SYS.STB` by an unprivileged program,
+      with its wraps every 497 days counted. Setting the clock doesn't
+      move it.
 
-    - **A clock module** (name to choose, e.g. `Clock`). It would give:
-      - the monotonic clock, in ms and in µs;
-      - the time now, UTC, as fields and as ISO 8601 text
-        (`2026-11-16T12:34:56Z`).
+    `rtl/vax/TaskWaiting.Now` still reads `$GETTIM`, so Tasks' deadlines
+    on VMS move when the clock is set; that is "Ongoing bug fixing" 22,
+    since Tasks can't import a library.
 
-      It must be computed without `gmtime_r` or `localtime`, so that it
-      is safe on a task's stack (pogemini's `GemServer.now` already
-      does this, by Howard Hinnant's `civil_from_days`).
-      - **Users:** polibtls's and posockets' `now`, and pogemini's
-        timestamp.
-      - **Relation to `TaskWaiting.Now`:** it already has the
-        monotonic clock in µs, but it is "for Tasks only". Whether
-        `TaskWaiting` should call the new module, or keep its own, is
-        decided when it is written.
-      - **VAX/VMS:** the monotonic clock can come from `$GETTIM`, as
-        `rtl/vax/TaskWaiting` does. UTC needs a system call that gives
-        UTC rather than local time (`SYS$GETUTC`?); to be checked on
-        the guest.
-    - **Stop requests** (name to choose). It would catch the requests to
-      stop and let the program ask which came, 0 if none:
-      - on Unix, SIGTERM and SIGINT;
-      - on VMS, perhaps Ctrl-C or Ctrl-Y through an AST.
+    **To check before the programs move to poDateTime:** that
+    `Clocks.Now` and `TimeStrings`' ISO 8601 formatting run in a 16 KiB
+    task on NetBSD and OpenBSD. On Unix `Clocks.Now` takes the UTC path
+    (`clock_gettime`, no `localtime`); `TimeStrings`' stack use is not
+    yet measured.
 
-      Each is caught only once, so that a second request ends the
-      program at once (pogemini's `SA_RESETHAND`).
-      - **Waking a task:** an option to post a `Tasks.Event` on a
-        request, so that a server waiting in `Tasks` learns of it at
-        once. Done through a procedure the program installs, so that
-        the module doesn't import `Tasks`.
-      - **Rules:** it follows the rules of "Threads and signal
-        handlers" (c67aad2) for what a handler may do.
-      - **Platform's interface stays:** `Platform.SetInterruptHandler`
-        (voc's, SIGINT only) is unchanged.
-      - **Users:** pogemini's `GemServer.catch` and `caught`.
-      - **VMS:** what VMS offers to match SIGTERM is to be found out.
+    **Candidate for `rtl` (decision 2): stop requests** (name to
+    choose). It would catch the requests to stop and let the program
+    ask which came, 0 if none:
+    - on Unix, SIGTERM and SIGINT;
+    - on VMS, perhaps Ctrl-C or Ctrl-Y through an AST.
+
+    Each is caught only once, so that a second request ends the
+    program at once (pogemini's `SA_RESETHAND`).
+    - **Waking a task:** an option to post a `Tasks.Event` on a
+      request, so that a server waiting in `Tasks` learns of it at
+      once. Done through a procedure the program installs, so that the
+      module doesn't import `Tasks`.
+    - **Rules:** it follows the rules of "Threads and signal handlers"
+      (c67aad2) for what a handler may do.
+    - **Platform's interface stays:** `Platform.SetInterruptHandler`
+      (voc's, SIGINT only) is unchanged.
+    - **Users:** pogemini's `GemServer.catch` and `caught`.
+    - **VMS:** what VMS offers to match SIGTERM is to be found out.
 
     **Candidates for the Unix library (decision 3):**
     - becoming another user, all-or-nothing, with a check that root
@@ -1566,17 +1599,19 @@ Those done while Phase 15 was current, 1 and 2, are in
     becomes of this plan.
 
     **Steps:**
-    1. Settle the decisions and the names with the user.
-    2. The clock module in `rtl/llvm` and `rtl/vax`, with:
+    1. Choose the names with the user: the stop-request module and the
+       Unix library.
+    2. The stop-request module in `rtl/llvm` and `rtl/vax`, with:
        - fixtures, including one that runs it in a 16 KiB task on the
          BSD hosts;
        - its `rtl/llvm/README.md` entry;
        - the Reference Guide regenerated.
-    3. The stop-request module, the same way.
-    4. polibtls, posockets and pogemini move to them in their next
-       release. This raises the poc they need to the release that has
-       the modules, so do it when they need a new poc anyway.
-    5. The Unix library, as a project of its own, when the next program
+    3. polibtls, posockets and pogemini move to poDateTime's clocks
+       (after the 16 KiB check above) and to the stop-request module
+       in their next release. This raises the poc they need to the
+       release that has the module, so do it when they need a new poc
+       anyway.
+    4. The Unix library, as a project of its own, when the next program
        needs one of its services.
 
 ## Ongoing language enhancements
