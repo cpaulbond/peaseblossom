@@ -21,7 +21,7 @@ rm -rf work
 mkdir work
 cp TaskTerm.mod work/
 (cd work && poc -target vax-dec-vms -vax-macro32 -import-path $rtl \
-  -link COROUTINESWITCH.OBJ -build TaskTerm.mod) >>result 2>&1
+  -link COROUTINESWITCH.OBJ -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -build TaskTerm.mod) >>result 2>&1
 echo "VAX build exit $?" >>result
 if [ "${VAX_GUEST:-}" = skip ]; then
   echo "SKIPPED: running TaskTerm at the VAX's terminal (VAX_GUEST=skip)"

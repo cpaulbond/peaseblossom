@@ -99,7 +99,7 @@ copy base KIT/OBJCONVERT $(ls "$KIT"/objconvert/* | grep -v '/PocRtl\.mar$')
 for model in O2 OC; do
   libs=$KIT/libs/vax-dec-vms/$model
   (cd "$KIT/libs" &&
-   "$POC_BIN_DIR/poc" -$model -target vax-dec-vms -clear-library-path -output-dir . -library POCRTL \
+   "$POC_BIN_DIR/poc" -$model -target vax-dec-vms -clear-library-path -output-dir . -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -library POCRTL \
      $(LC_ALL=C ls "$ROOT"/rtl/vax/*.Mod) "$ROOT/rtl/vax/PocRtl.mar" "$ROOT/rtl/vax/CoroutineSwitch.mar" &&
    "$POC_BIN_DIR/poc" -$model -target vax-dec-vms -clear-library-path -library-path . -output-dir . \
      -library VMSDEF $(LC_ALL=C ls "$ROOT"/rtl/vax/vms/*.Mod) &&

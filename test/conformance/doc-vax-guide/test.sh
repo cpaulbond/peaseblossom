@@ -35,7 +35,7 @@ for program in Hello Versions WhereLogin WhereLogin2 Dates Factorial Words Syste
   extra= flags=
   [ $program = Shell ] && extra=ShellCommands.cld
   [ $program = Fail ] && flags=-trap-location
-  [ $program = TaskMailbox ] && flags="-link COROUTINESWITCH.OBJ"
+  [ $program = TaskMailbox ] && flags="-link COROUTINESWITCH.OBJ -link SYS\$SYSTEM:SYS.STB/SELECTIVE_SEARCH"
   (cd work/build && poc -target vax-dec-vms $flags -import-path ../../$rtl -import-path ../../$rtl/vms \
     -import-path ../../$rtl/vmslib -build $program.Mod $extra) >>result 2>&1
   echo "VAX build $program exit $?" >>result

@@ -5,7 +5,7 @@
 # system clock ticks every 10 ms), and an event posted by the AST of a
 # Timers.After (rtl/vax/vmslib) while another task sleeps. Built by poc
 # -build in work/ from the runtime's, vmslib's and STARLET's sources, with
-# -link COROUTINESWITCH.OBJ, and run on the guest (vax_do), both ways
+# -link COROUTINESWITCH.OBJ and SYS.STB, and run on the guest (vax_do), both ways
 # (vax_build).
 . ../../vaxfixture.sh
 rtl=../../../../rtl/vax
@@ -18,7 +18,7 @@ rm -rf work
 mkdir work
 cp TaskTimes.mod work/
 (cd work && poc -target vax-dec-vms $vax_way_option -import-path $rtl -import-path $rtl/vmslib \
-  -import-path $rtl/vms -link COROUTINESWITCH.OBJ -build TaskTimes.mod) >>result 2>&1
+  -import-path $rtl/vms -link COROUTINESWITCH.OBJ -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -build TaskTimes.mod) >>result 2>&1
 echo "VAX build exit $?" >>result
 vax_do guest-run.com guest-run.expected work/TaskTimes.com $written \
   ../../../rtl/vax/PocRtl.mar ../../../rtl/vax/CoroutineSwitch.mar

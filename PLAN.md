@@ -1450,7 +1450,7 @@ Those fixed while Phase 18 was current, 8-10, are in
     `llvm-coroutines-valgrind` (0 errors from the two-task program,
     `Primes 50` and `Queens`; skipped where there is no valgrind).
 
-22. **Tasks' deadlines on VAX/VMS move when the clock is set**. Found
+22. **Tasks' deadlines on VAX/VMS move when the clock is set** [fixed]. Found
     2026-11-16, planning "Ongoing library enhancements" 7 with the user.
     `rtl/vax/TaskWaiting.Now` reads `$GETTIM`, the system clock, which
     on VMS 5.5-2 is local time, set with `$SETIME` at the changes of
@@ -1465,6 +1465,24 @@ Those fixed while Phase 18 was current, 8-10, are in
     program using `Tasks`, gets linked with `SYS.STB` is part of the
     fix. A fixture can't set the guest's clock unprivileged, so it
     checks only that `Now` never decreases and follows elapsed time.
+    Fixed 2026-11-16: `Now` reads the cell, declared as an external
+    variable, and counts its wraps. `SYS.STB` comes by
+    `-link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH'`, with no change to the
+    driver: given when `POCRTL` is built (the GNUmakefile, the kits,
+    every fixture that builds its own), it is recorded in `POCRTL`'s
+    manifest, so it reaches `POCRTL`'s own shareable link and every
+    program and library linked against `POCRTL`; a program that takes
+    `Tasks` from `rtl/vax`'s source names it beside
+    `COROUTINESWITCH.OBJ` (the *VAX/VMS Guide*, "Tasks"). Only an
+    image that refers to the cell takes a version dependency (checked
+    by `ANALYZE/IMAGE`: a program linked with the line but not with
+    `TaskWaiting` has an empty system version array; one using `Tasks`
+    has `SYS$K_STABLE` 1.80 alone), so `POCRTL.EXE` and a program that
+    links `TaskWaiting` must be linked again only if that category's
+    major version changes. Without the line, the link fails on the undefined
+    `EXE$GL_ABSTIM_TICS` (checked). `vax-tasks-time` checks that `Now`
+    never goes back over 10000 reads, and moves within 20 ms of the
+    system time over a 500 ms sleep.
 
 ## Ongoing library enhancements
 

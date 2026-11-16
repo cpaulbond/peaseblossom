@@ -5,7 +5,7 @@
 # tasks blocked), each case of 20 (misuse), whose texts PocRtl.mar's
 # POC_TRAP finds by the case in the code's high word, and 17 (a Yield in a
 # finalizer); each with a finalizer run, and its status. Built by poc
-# -build with -link COROUTINESWITCH.OBJ and run on the guest (vax_do),
+# -build with -link COROUTINESWITCH.OBJ and SYS.STB and run on the guest (vax_do),
 # both ways (vax_build).
 . ../../vaxfixture.sh
 rtl=../../../rtl/vax
@@ -16,7 +16,7 @@ rm -f TaskTraps.com
 : >result
 builds() {
 rm -f $symbols $written
-poc -target vax-dec-vms $vax_way_option -import-path $rtl -link COROUTINESWITCH.OBJ -build TaskTraps.mod >>result 2>&1
+poc -target vax-dec-vms $vax_way_option -import-path $rtl -link COROUTINESWITCH.OBJ -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -build TaskTraps.mod >>result 2>&1
 echo "VAX build exit $?" >>result
 vax_do guest-run.com guest-run.expected TaskTraps.com $written $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
 }

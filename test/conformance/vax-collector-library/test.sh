@@ -27,8 +27,8 @@ start() {
 : >result
 rtl=../../../rtl/vax
 lib=libs/vax-dec-vms/O2
-echo "== poc -target vax-dec-vms -vax-objects -output-dir libs -library POCRTL rtl/vax/*.Mod rtl/vax/PocRtl.mar rtl/vax/CoroutineSwitch.mar" >>result
-poc -target vax-dec-vms -vax-objects -output-dir libs -library POCRTL $(LC_ALL=C ls $rtl/*.Mod) $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar >>result 2>&1
+echo "== poc -target vax-dec-vms -vax-objects -output-dir libs -link SYS\$SYSTEM:SYS.STB/SELECTIVE_SEARCH -library POCRTL rtl/vax/*.Mod rtl/vax/PocRtl.mar rtl/vax/CoroutineSwitch.mar" >>result
+poc -target vax-dec-vms -vax-objects -output-dir libs -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -library POCRTL $(LC_ALL=C ls $rtl/*.Mod) $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar >>result 2>&1
 echo "exit $?" >>result
 run -target vax-dec-vms -vax-objects -output-dir libs -library-path libs -library HOLDLIB HoldLib.mod PlainLib.mod
 echo "HOLDLIB's modules:" >>result

@@ -56,7 +56,7 @@ rtl=../../../rtl/vax
 lib=libs/vax-dec-vms/O2
 # in C's order, as ls sorts the library directory below: a glob follows the
 # locale, which puts MathL.Mod before Math.Mod in en_US
-run -target vax-dec-vms -output-dir libs -library POCRTL $(LC_ALL=C ls $rtl/*.Mod) $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
+run -target vax-dec-vms -output-dir libs -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -library POCRTL $(LC_ALL=C ls $rtl/*.Mod) $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
 run -target vax-dec-vms -output-dir libs -library-path libs -library VAXLIB VaxLibBase.mod VaxLibShapes.mod VaxLibSums.mod
 compare expected-VAXLIB_build.com $lib/VAXLIB_build.com
 compare expected-VAXLIB_setup.com $lib/VAXLIB_setup.com
@@ -105,7 +105,7 @@ compare useolb.com useinst-renamed.com
 rm -rf main2 useinst.com useinst-renamed.com
 # the same libraries from poc's objects (step 6b)
 olib=objects/libs/vax-dec-vms/O2
-run -target vax-dec-vms -vax-objects -output-dir objects/libs -library POCRTL $(LC_ALL=C ls $rtl/*.Mod) $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
+run -target vax-dec-vms -vax-objects -output-dir objects/libs -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -library POCRTL $(LC_ALL=C ls $rtl/*.Mod) $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
 run -target vax-dec-vms -vax-objects -output-dir objects/libs -library-path objects/libs -library VAXLIB \
   VaxLibBase.mod VaxLibShapes.mod VaxLibSums.mod
 compare expected-VAXLIB_build-objects.com $olib/VAXLIB_build.com

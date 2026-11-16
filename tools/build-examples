@@ -90,7 +90,10 @@ else
     extra= flags=
     [ $program = Shell ] && extra=ShellCommands.cld
     [ $program = Fail ] && flags=-trap-location
-    case $program in TaskMailbox|Queens|WordSets) flags="-link COROUTINESWITCH.OBJ" ;; esac
+    case $program in
+      TaskMailbox) flags="-link COROUTINESWITCH.OBJ -link SYS\$SYSTEM:SYS.STB/SELECTIVE_SEARCH" ;;
+      Queens|WordSets) flags="-link COROUTINESWITCH.OBJ" ;;
+    esac
     run "$out" "$program" "$poc" -target vax-dec-vms $flags -import-path "$rtl" \
       -import-path "$rtl/vms" -import-path "$rtl/vmslib" -build $program.Mod $extra
   done

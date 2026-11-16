@@ -13,5 +13,6 @@ After(-5) in Select: 1
 a closed After got nothing
 slept at least 200 ms
 awaited 20 posts, ASTs 20
+Now kept pace with the system time
 done
 run status: %X00000001

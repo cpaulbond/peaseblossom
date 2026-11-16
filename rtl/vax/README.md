@@ -5,8 +5,9 @@ over a thin MACRO-32 layer (`doc/developer/vax-macro32-backend.md`,
 section 15). A program finds these modules as source, `poc -target
 vax-dec-vms -import-path <this directory> -build ...` compiling the ones
 it imports with it, or in the library `POCRTL` (Phase 17 step 1,
-section 18), made by `poc -target vax-dec-vms -library POCRTL
-rtl/vax/*.Mod rtl/vax/PocRtl.mar rtl/vax/CoroutineSwitch.mar`. Which of `rtl/llvm`'s modules are to
+section 18), made by `poc -target vax-dec-vms -link
+'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -library POCRTL rtl/vax/*.Mod
+rtl/vax/PocRtl.mar rtl/vax/CoroutineSwitch.mar`. Which of `rtl/llvm`'s modules are to
 come, and what each needs, is in `doc/research/vms-module-inventory.md`.
 
 - `PocRtl.mar`, MACRO-32, which a program poc builds for `vax-dec-vms`
@@ -177,7 +178,9 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   (fixture `tasks-same-source`). It switches with
   `Coroutines.TransferForTasks`, which leaves out `Transfer`'s check for
   AST level (decision 13), so a call that blocks in an AST is undefined.
-- `TaskWaiting.Mod` - `Tasks`' system part: the clock (`$GETTIM`), the
+- `TaskWaiting.Mod` - `Tasks`' system part: the clock (the ticks since
+  boot, `EXE$GL_ABSTIM_TICS`, through `SYS.STB`, which `POCRTL` and a
+  program using `Tasks` from source are linked with), the
   idle wait (`$HIBER`, with a `$SETIMR` of its own for a timeout), the
   wake an AST gives (`$WAKE`), and the traps 19 (all tasks blocked) and
   20 (misuse, by case), through `POC_TRAP`, whose texts are in

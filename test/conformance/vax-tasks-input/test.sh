@@ -18,7 +18,7 @@ rm -rf work
 mkdir work
 cp TaskReadIn.mod TaskFeeder.mod work/
 (cd work && poc -target vax-dec-vms $vax_way_option -import-path $rtl \
-  -link COROUTINESWITCH.OBJ -build TaskReadIn.mod &&
+  -link COROUTINESWITCH.OBJ -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -build TaskReadIn.mod &&
   poc -target vax-dec-vms $vax_way_option -import-path $rtl -build TaskFeeder.mod) >>result 2>&1
 echo "VAX build exit $?" >>result
 vax_do guest-run.com guest-run.expected work/TaskReadIn.com work/TaskFeeder.com $written \

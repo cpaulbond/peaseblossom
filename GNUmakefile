@@ -659,7 +659,7 @@ VAX_GUIDE_TEXT_SOURCE := $(if $(filter no,$(VAX_GUIDE)),,$(or $(wildcard doc/tex
 $(VAX_LIB)/%/POCRTL.library: $(STAGE2_BIN) $(VAX_RTL_SRCS)
 	@echo "POCRTL for vax-dec-vms -$*"
 	@$(STAGE2_BIN) -$* -target vax-dec-vms -clear-library-path -output-dir $(STAGE2_LIB) \
-	  -library POCRTL $(VAX_RTL_SRCS) >/dev/null
+	  -link 'SYS$$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -library POCRTL $(VAX_RTL_SRCS) >/dev/null
 
 $(VAX_LIB)/%/VMSDEF.library: $(VAX_LIB)/%/POCRTL.library $(VMSDEF_SRCS)
 	@echo "VMSDEF for vax-dec-vms -$*"

@@ -709,7 +709,7 @@ has, described at the end of this chapter.
 | `VT100` | `Out.Flush` | Each sequence reaches the terminal as it is sent. |
 | `GarbageCollectedHeap` | `LIB$GET_VM`, `$DCLEXH` | The heap is limited by the paging file quota. |
 | `Coroutines` | `LIB$GET_VM_PAGE`, `$SETPRT`, `COROUTINESWITCH.MAR` | Smaller stacks, counted against the paging file quota whole. |
-| `Tasks` | `Coroutines`, `$HIBER`, `$WAKE`, `$SETIMR`, `$GETTIM` | An AST posts, not a signal handler. No `AwaitReadable` or `AwaitWritable`, timed or not. |
+| `Tasks` | `Coroutines`, `$HIBER`, `$WAKE`, `$SETIMR`, `EXE$GL_ABSTIM_TICS` | An AST posts, not a signal handler. No `AwaitReadable` or `AwaitWritable`, timed or not. |
 | `TaskInput` | `$ASSIGN`, `$QIO`, `Platform.Read` | A terminal or mailbox is read a record at a time; a file stops every task. |
 
 ### Files
@@ -967,9 +967,12 @@ own request identifier, so that `$CANTIM` cancels it alone, and `Tasks`
 never calls `$SCHDWK` or `$CANWAK`: `$CANWAK` would cancel every
 scheduled wakeup in the process, a program's own included. A `$HIBER`
 that ends for some other reason is harmless; `Tasks` looks again. The
-clock is the system time from `$GETTIM`, which ticks every 10 ms, so
-`Sleep` and `After` wait at least their time and up to a tick or two
-more. `SetIdleStep` replaces the wait, as on Unix.
+clock is not the system time: VMS 5.5 keeps local time, set back or
+forward with `$SETIME` at the changes of daylight saving time, which
+would move every deadline with it. It is `EXE$GL_ABSTIM_TICS`, the
+executive's count of 10 ms ticks since boot, which setting the time
+leaves alone, so `Sleep` and `After` wait at least their time and up to
+a tick or two more. `SetIdleStep` replaces the wait, as on Unix.
 
 **Stacks.** A task's stack is a coroutine's, so `Tasks.DefaultStackSize`
 is 32 KiB and the least is 8 KiB, counted against the paging file quota
@@ -1003,7 +1006,18 @@ under it. Run such a program under the debugger only after
 
 **Building from the runtime's source.** `Tasks` imports `Coroutines`,
 so a program built from `rtl/vax`'s source names `COROUTINESWITCH.OBJ`
-to the link and assembles it on VMS, as above.
+to the link and assembles it on VMS, as above. It also names the
+system's symbol table, where `EXE$GL_ABSTIM_TICS` is found, as `POCRTL`
+does:
+
+    $ poc -target vax-dec-vms -import-path ~/src/peaseblossom/rtl/vax \
+        -link COROUTINESWITCH.OBJ -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' \
+        -build TaskMailbox.Mod
+
+An image linked with `SYS.STB` records the version of the part of the
+executive it uses (`SYS$K_STABLE`), and VMS refuses to run it
+(`SS$_SYSVERDIF`) on a system where that part's major version differs,
+until it is linked again there.
 
 ### Three modules VMS alone has
 

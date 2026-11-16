@@ -2,8 +2,11 @@ MODULE TaskTimes;
   (* Tasks' time on VAX/VMS (doc/developer/tasks.md, Phase 10), the program
      of llvm-tasks-time, renamed, and an AST from Timers.After that posts
      an event a task awaits while another sleeps. Elapsed times are printed
-     only as "at least as long as asked". *)
-  IMPORT SYSTEM, Tasks, Timers, Platform, Out;
+     only as "at least as long as asked". TaskWaiting.Now, the clock of
+     Tasks' deadlines, is the ticks since boot, not the system time
+     (PLAN.md, "Ongoing bug fixing" 22): it must never go back, and must
+     keep pace with the system time while nobody sets it. *)
+  IMPORT SYSTEM, Tasks, TaskWaiting, Timers, Platform, Out;
 
   CONST
     posts = 20;
@@ -26,7 +29,8 @@ MODULE TaskTimes;
     m: Tasks.Message;
     timedOut: Tasks.Event;
     astsCaught: LONGINT;  (* by the AST *)
-    i, index, start: LONGINT;
+    i, index, start, elapsed: LONGINT;
+    now, last: HUGEINT;
     status: SYSTEM.INT32;
 
   PROCEDURE AtLeast(start, ms: LONGINT);
@@ -150,6 +154,25 @@ BEGIN
   Tasks.Start(awaiter, Tasks.DefaultStackSize);
   Tasks.Start(sleepers[0], Tasks.DefaultStackSize);
   Tasks.Join(awaiter); Tasks.Join(sleepers[0]);
+
+  (* Now never goes back, and over a sleep it moves as the system time
+     does, within two 10 ms ticks *)
+  last := TaskWaiting.Now(); i := 0;
+  WHILE i < 10000 DO
+    now := TaskWaiting.Now();
+    IF now < last THEN Out.String("Now went back"); Out.Ln END;
+    last := now; INC(i)
+  END;
+  start := Platform.Time(); last := TaskWaiting.Now();
+  Tasks.Sleep(500);
+  elapsed := Platform.Time() - start; now := TaskWaiting.Now();
+  IF ABS(SHORT((now - last) DIV 1000) - elapsed) <= 20 THEN
+    Out.String("Now kept pace with the system time")
+  ELSE
+    Out.String("Now moved "); Out.Int(SHORT((now - last) DIV 1000), 0);
+    Out.String(" ms while the system time moved "); Out.Int(elapsed, 0); Out.String(" ms")
+  END;
+  Out.Ln;
 
   (* a timer still pending at the end does not hold the program *)
   ch := Tasks.After(100000);

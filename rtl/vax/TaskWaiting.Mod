@@ -1,11 +1,20 @@
 MODULE TaskWaiting;
   (* What Tasks needs that differs between the systems (doc/developer/
-     tasks.md, decision 1), here for VAX/VMS: the clock ($GETTIM), the
-     idle wait ($HIBER, with a $SETIMR of its own for a timeout), the wake
+     tasks.md, decision 1), here for VAX/VMS: the clock (the ticks since
+     boot), the idle wait ($HIBER, with a $SETIMR of its own for a timeout), the wake
      an AST gives ($WAKE), and the traps 19 and 20, through POC_TRAP, with
      their texts in PocRtl.mar. VMS has no descriptors to wait for: an I/O
      wait is a $QIO whose AST posts an event. rtl/llvm/TaskWaiting.Mod has
-     the same interface for POSIX. For Tasks only. *)
+     the same interface for POSIX. For Tasks only.
+
+     The clock is EXE$GL_ABSTIM_TICS, the executive's count of 10 ms
+     ticks since boot, which user mode may read, through SYS.STB, which
+     POCRTL is linked with: not $GETTIM's system time, which on VMS 5.5
+     is local time, set with $SETIME at the changes of daylight saving
+     time, and which would move every deadline with it (PLAN.md,
+     "Ongoing bug fixing" 22; poDateTime's Q8). The cell is an unsigned
+     longword that wraps after 497 days; Now counts the wraps it sees,
+     so a deadline more than 497 days away may come early. *)
 
   IMPORT SYSTEM;
 
@@ -19,15 +28,19 @@ MODULE TaskWaiting;
     (* the request identifier of Wait's timer, "TASK", which $CANTIM
        cancels alone *)
     timerRequest = 5441534BH;
+    microsecondsPerTick = 10000;
 
   TYPE
     (* AsynchronousTraps' AstRoutine, not imported, so that Tasks does
        not bring in AsynchronousTraps *)
     AstRoutine = PROCEDURE (parameter: SYSTEM.CARD32);
 
+  VAR
+    ["VMS", "EXE$GL_ABSTIM_TICS"] absoluteTicks-: SYSTEM.INT32;
+    lastTicks, wraps: HUGEINT;   (* Now's last reading, and the wraps it has seen *)
+
   (* POC_TRAP with no location: the message for code, then $EXIT *)
   PROCEDURE ["VMS", "POC_TRAP"] Trap(code, module, line, column: SYSTEM.INT32);
-  PROCEDURE ["VMS", "SYS$GETTIM"] GetTime(VAR time: HUGEINT): SYSTEM.INT32;
   PROCEDURE ["VMS", "SYS$HIBER"] Hibernate(): SYSTEM.INT32;
   PROCEDURE ["VMS", "SYS$WAKE"] WakeProcess(VAR pid: SYSTEM.CARD32;
     name-: ARRAY OF CHAR): SYSTEM.INT32;
@@ -47,12 +60,16 @@ MODULE TaskWaiting;
     Trap(misuse + which * 65536, 0, 0, 0)
   END Misuse;
 
-  (* The system time in microseconds *)
+  (* The time since boot in microseconds, in steps of 10 ms; setting the
+     system time does not move it *)
   PROCEDURE Now*(): HUGEINT;
-    VAR time: HUGEINT; status: SYSTEM.INT32;
+    VAR ticks: HUGEINT;
   BEGIN
-    status := GetTime(time);
-    RETURN time DIV 10
+    ticks := absoluteTicks;
+    IF ticks < 0 THEN ticks := ticks + 100000000H END;
+    IF ticks < lastTicks THEN INC(wraps) END;
+    lastTicks := ticks;
+    RETURN (wraps * 100000000H + ticks) * microsecondsPerTick
   END Now;
 
   (* Ends a Wait that is going on or about to start: $WAKE, which VMS

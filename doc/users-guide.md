@@ -1747,7 +1747,8 @@ While the reader waits for a line, the ticker and the main program run.
 Both programs run unchanged on VAX/VMS, as foreign commands
 (`CLOCK :== $DEV:[DIR]CLOCK.EXE`, then `CLOCK 30`). A program built from
 `rtl/vax`'s source links `COROUTINESWITCH.OBJ`, as a program that uses
-coroutines does (the *VAX/VMS Guide*, "Coroutines"). On a terminal,
+coroutines does, and `SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH`, for the
+clock (the *VAX/VMS Guide*, "Coroutines" and "Tasks"). On a terminal,
 `TaskInput` keeps reading while the other tasks write: their lines break
 through the read, and VMS writes again what has been typed so far.
 

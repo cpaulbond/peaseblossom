@@ -5,7 +5,7 @@
 # llvm-tasks-sync, renamed so that none is named as a runtime module is on
 # a system whose file names ignore case. Built by poc -build with -link
 # COROUTINESWITCH.OBJ, which guest-run.com assembles from
-# rtl/vax/CoroutineSwitch.mar, and run on the guest (vax_do), both ways
+# rtl/vax/CoroutineSwitch.mar, and -link SYS.STB, and run on the guest (vax_do), both ways
 # (vax_build).
 . ../../vaxfixture.sh
 rtl=../../../rtl/vax
@@ -19,7 +19,7 @@ rm -f $scripts
 builds() {
 rm -f $symbols $written
 for program in $programs; do
-  poc -target vax-dec-vms $vax_way_option -import-path $rtl -link COROUTINESWITCH.OBJ -build $program.mod >>result 2>&1
+  poc -target vax-dec-vms $vax_way_option -import-path $rtl -link COROUTINESWITCH.OBJ -link 'SYS$SYSTEM:SYS.STB/SELECTIVE_SEARCH' -build $program.mod >>result 2>&1
   echo "VAX build of $program exit $?" >>result
 done
 vax_do guest-run.com guest-run.expected $scripts $written $rtl/PocRtl.mar $rtl/CoroutineSwitch.mar
