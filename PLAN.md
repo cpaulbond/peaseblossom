@@ -1134,6 +1134,50 @@ says:
   checked as `POC2` (`HELLO.MOD` built and run). The tree held only
   0.11.2.
 
+## Peaseblossom 0.13.0
+
+What `main` had gained since 0.12.0 was released as **Peaseblossom
+0.13.0** on 2026-11-15: `Tasks`' `AwaitReadableFor` and
+`AwaitWritableFor`, a descriptor wait with a time limit, on both back
+ends (`73109d2`), and a second kit of the VAX/VMS Guide's examples,
+`POC-EXAMPLES-SOURCE-<version>.COM`, whose `BUILD.COM` builds them with
+an installed poc and rebuilds what changed, with Queens and WordSets in
+both examples kits (`5fab241`); the source kit is now a release file.
+The compiler is unchanged (nothing under `src/` but `Version.Mod`); a
+library from an older poc must be rebuilt. It was made as
+`doc/developer/DEVELOPER.md` section 7 says:
+
+- **The version** was set in `553d968` by `make set-version`; the kit
+  names in `tools/build-examples` and `tools/build-examples-source`'s
+  header comments were changed by hand. The gate passed on atla,
+  cymoril, artos and alerik (539 fixtures, the fixed point,
+  `check-strict`, `check-install` and `check-seed` on each; atla's
+  `check-opt2` 389). rackhir passed `553d968`, and `make
+  check-vax-kit` passed on the guest.
+- **The tarball** came from `make distcheck` (SHA-256 `2e1d6d41...`,
+  14351926 bytes). It is signed, with the signed tag `v0.13.0`, and
+  published as a GitHub release with the kits `POC-0-13-0.COM`,
+  `POC-VMS-0-13-0.COM`, `POC-EXAMPLES-0-13-0.COM` and
+  `POC-EXAMPLES-SOURCE-0-13-0.COM`.
+- **Each package** was made from the published tarball (only the
+  `distinfo` files changed, packing lists unchanged), on alerik,
+  rackhir, cymoril, jherek, artos and yishana, replacing 0.12.0 and
+  checked against the installed poc; rackhir's `peaseblossom-vax` is
+  alerik's. Over the office's DSL link each host's fetch of the
+  tarball from GitHub took about 12 minutes, so rackhir's was copied
+  into its distfiles from atla instead; the `debian:trixie` container
+  on atla (amd64) took an hour, most of it `apt-get`. sadric built the
+  arm64 Debian packages, which replace 0.12.0 there, checked the same
+  way. `mock` built and checked the RPMs, and on atla 0.13.0 replaces
+  0.12.0, with `peaseblossom-vax`, checked the same way.
+- **The RPMs and `SHA256SUMS`** were signed, gathered by
+  `tools/release-files` (25 files) and attached to the release; every
+  asset's SHA-256 as GitHub reports it matches the local file, and
+  `SHA256SUMS` and its signature check.
+- **The guest's `DUA1:[POC]`** holds 0.13.0, from the published kits,
+  checked as `POC2` (`HELLO.MOD` built and run). The tree held only
+  0.12.0.
+
 ## Ongoing bug fixing
 
 Bugs found outside a phase's own work - by using poc on other programs -

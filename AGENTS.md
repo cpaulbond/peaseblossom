@@ -589,7 +589,11 @@ on 2026-11-02** (tag `v0.11.0`, with the kits; the record is in
 `PLAN.md`, "Peaseblossom 0.11.0"), and **0.11.1** followed on
 2026-11-06 with one fix (a string literal in an array index; tag
 `v0.11.1`), and **0.11.2** on 2026-11-07 with `BUILDVIAOBJ.COM` in the
-VAX/VMS base kit (tag `v0.11.2`). Bugs found by using
+VAX/VMS base kit (tag `v0.11.2`). The runtime modules `Coroutines`
+and `Tasks`, Debian packages and the examples kit were released as
+**Peaseblossom 0.12.0 on 2026-11-15**, and `Tasks`' timed descriptor
+waits and the examples' source kit as **0.13.0** the same day (tags
+`v0.12.0`, `v0.13.0`; the records are in `PLAN.md`). Bugs found by using
 poc on other programs are fixed as they come (`PLAN.md`, "Ongoing bug
 fixing"), and the runtime-library additions and language extensions it
 shows are wanted are made the same way (`PLAN.md`, "Ongoing library
