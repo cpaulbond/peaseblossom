@@ -556,8 +556,10 @@ the names, and the variables that give them to the tools, are yours.
    `DISTVERSION` in the FreeBSD ports, `V` in the OpenBSD port and
    `DISTNAME` in pkgsrc's packages (`peaseblossom-vax` is a port of its
    own for FreeBSD and pkgsrc, a subpackage for Fedora, Debian and OpenBSD), and in `INSTALL.md`'s example, the
-   Reference Guide's "describes poc <major.minor>" and the VAX/VMS
-   Guide's example of unpacking the kits. It removes any
+   Reference Guide's "describes poc <major.minor>", the VAX/VMS
+   Guide's example of unpacking the kits, and the examples kits' names
+   in the comments of `tools/build-examples` and
+   `tools/build-examples-source`. It removes any
    `PORTREVISION`, `REVISION` or `PKGREVISION`, and adds a `%changelog`
    entry and an entry for `<x.y.z>-1` at the top of
    `packaging/debian/changelog` (Debian's version is its changelog's),

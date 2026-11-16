@@ -10,7 +10,10 @@
 # unpacking the tarball and installing a release's packages (their file
 # names and download URLs), the Reference Guide's "describes poc
 # <major.minor>" and the VAX/VMS Guide's example of unpacking the kits
-# (their names, POC-<x-y-z>, and what POC -VERSION prints). Debian's
+# (their names, POC-<x-y-z>, and what POC -VERSION prints), and the
+# examples kits' names in the comments of tools/build-examples and
+# tools/build-examples-source (POC-EXAMPLES-<x-y-z>,
+# POC-EXAMPLES-SOURCE-<x-y-z>). Debian's
 # version is its changelog's: packaging/debian/changelog gets an entry for
 # <version>-1 at its top. That entry and the %changelog one say only
 # "Update to <version>.", for the person releasing to fill in; one already
@@ -60,6 +63,8 @@ must INSTALL.md 'peaseblossom-[0-9]+\.[0-9]+\.[0-9]+'
 must doc/reference-guide.md 'describes poc [0-9]+\.[0-9]+ '
 must doc/vax-vms-guide.md '@\[-\]POC-[0-9]+-[0-9]+-[0-9]+$'
 must doc/vax-vms-guide.md '^    poc [0-9]+\.[0-9]+\.[0-9]+$'
+must tools/build-examples '@POC-EXAMPLES-[0-9]+-[0-9]+-[0-9]+$'
+must tools/build-examples-source '@POC-EXAMPLES-SOURCE-[0-9]+-[0-9]+-[0-9]+$'
 
 edit src/driver/Version.Mod "s/^\( *number\* *= *\)\"[^\"]*\";/\1\"$version\";/"
 
@@ -109,5 +114,9 @@ edit doc/reference-guide.md \
 hyphens=$(printf '%s\n' "$version" | tr . -)
 edit doc/vax-vms-guide.md \
   "s/POC-\(VMS-\)\{0,1\}[0-9][0-9]*-[0-9][0-9]*-[0-9][0-9]*/POC-\1$hyphens/g; s/\(\.COM\` for \)[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*)/\1$version)/; s/^    poc [0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\$/    poc $version/"
+for script in build-examples build-examples-source; do
+  edit tools/$script \
+    "s/\(@POC-EXAMPLES-\(SOURCE-\)\{0,1\}\)[0-9][0-9]*-[0-9][0-9]*-[0-9][0-9]*\$/\1$hyphens/"
+done
 
 echo "set-version: $version$note"

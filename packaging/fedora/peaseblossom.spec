@@ -25,7 +25,7 @@
 %global __provides_exclude_from ^%{_prefix}/lib/poc/.*$
 
 Name:           peaseblossom
-Version:        0.13.1
+Version:        0.14.0
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
@@ -111,6 +111,19 @@ test/install/check-vax.sh %{buildroot}%{_bindir}/poc %{_builddir}/check-install-
 %{_docdir}/%{name}-vax/
 
 %changelog
+* Mon Nov 16 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.14.0-1
+- Update to 0.14.0: the runtime module StopRequests, on both back ends,
+  so that a program stops cleanly on SIGINT and SIGTERM (CTRL/C on
+  VAX/VMS), each caught once, with a notifier that may post a
+  Tasks.Event. Fixes: Tasks' deadlines on VAX/VMS no longer move when
+  the clock is set (the 10 ms ticks since boot, POCRTL linked with
+  SYS.STB); TaskInput reads a VMS mailbox in pieces no larger than its
+  messages; TaskInput on POSIX reads again after EINTR; Coroutines loads
+  the time zones on main's stack, since the first localtime overran a
+  16 KiB task on NetBSD amd64 and OpenBSD i386. The compiler is
+  unchanged; only the runtime libraries changed, and a library from an
+  older poc must be rebuilt.
+
 * Mon Nov 16 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.13.1-1
 - Update to 0.13.1: coroutines and tasks under valgrind's memcheck, which
   now follows a switch between two coroutines' stacks, since each stack
