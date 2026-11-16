@@ -16,13 +16,18 @@ MODULE TaskInput;
      class ($GETDVIW, DVI$_DEVCLASS; proposal 3):
      - A terminal or a mailbox is $ASSIGNed, and each record is read by a
        $QIO into a buffer of 512 bytes, whose AST posts an event the
-       reading task awaits, so other tasks run meanwhile. A record gets a
+       reading task awaits, so other tasks run meanwhile. A mailbox is
+       read at most its largest message at a time (DVI$_DEVBUFSIZ), since
+       a $QIO asking for more fails at once with SS$_MBTOOSML, before
+       anything is read (PLAN.md, bug 20). A record gets a
        line feed after it, except a terminal read that a full buffer ended
        (terminator size 0, I/O manual 8.5): the rest of that line comes
        with the next read. The end of the input is SS$_ENDOFFILE (a
        mailbox's IO$_WRITEOF), or a terminal read ended by Ctrl/Z, which
        RMS takes as the end too; what was typed before it is dropped, as
        RMS drops it. A longer mailbox message is cut short (SS$_BUFFEROVF).
+       Any other failure is the end of the input too, as an error is on
+       Unix.
      - A terminal read goes through PocRtl's POC_TASK_READ, which makes
        Out's unfinished line the read's prompt, as In's is, and has lines
        written while it is pending break through it (proposals 4 and 5).
@@ -46,6 +51,7 @@ MODULE TaskInput;
     bufferSize = 512;
     readVirtualBlock = 31H; (* IO$_READVBLK *)
     deviceClass = 4; (* DVI$_DEVCLASS *)
+    deviceBufferSize = 8; (* DVI$_DEVBUFSIZ: a mailbox's largest message *)
     terminalClass = 66; (* DC$_TERM *)
     mailboxClass = 160; (* DC$_MAILBOX *)
     bufferOverflow = 1537; (* SS$_BUFFEROVF *)
@@ -86,6 +92,7 @@ MODULE TaskInput;
     readDone: Tasks.Event; (* posted by the read's AST *)
     buffer: Buffer;
     length, position: LONGINT; (* the buffer's characters, the next one's *)
+    readSize: SYSTEM.INT32; (* the most a mailbox read asks for *)
 
   PROCEDURE ["VMS", "SYS$GETDVIW"] GetDeviceInformation(efn, chan: SYSTEM.CARD32;
     name-: ARRAY OF CHAR; VAR items: ItemList; VAR status: Iosb;
@@ -107,7 +114,7 @@ MODULE TaskInput;
 
   (* Decides how SYS$INPUT is read *)
   PROCEDURE Choose;
-    VAR class: SYSTEM.CARD32; items: ItemList; status: Iosb;
+    VAR class, size: SYSTEM.CARD32; items: ItemList; status: Iosb;
   BEGIN
     mode := synchronous;
     class := 0;
@@ -118,7 +125,17 @@ MODULE TaskInput;
         & ((class = terminalClass) OR (class = mailboxClass))
         & ODD(Assign("SYS$INPUT", channel, 0, 0)) THEN
       mode := byQio;
-      terminal := class = terminalClass
+      terminal := class = terminalClass;
+      readSize := bufferSize;
+      IF ~terminal THEN
+        size := 0;
+        items.length := 4; items.code := deviceBufferSize;
+        items.address := SYSTEM.ADR(size); items.returnLength := 0; items.end := 0;
+        IF ODD(GetDeviceInformation(0, LONG(channel), "", items, status, 0, 0, 0))
+            & ODD(status.status) & (size > 0) & (size < bufferSize) THEN
+          readSize := SYSTEM.VAL(SYSTEM.INT32, size)
+        END
+      END
     END
   END Choose;
 
@@ -128,7 +145,7 @@ MODULE TaskInput;
   BEGIN
     IF terminal THEN status := TaskRead(channel, buffer, bufferSize, iosb, ReadAst, 0)
     ELSE
-      status := Qio(0, channel, readVirtualBlock, iosb, ReadAst, 0, buffer, bufferSize, 0, 0, 0, 0)
+      status := Qio(0, channel, readVirtualBlock, iosb, ReadAst, 0, buffer, readSize, 0, 0, 0, 0)
     END;
     IF ~ODD(status) THEN atEnd := TRUE
     ELSE

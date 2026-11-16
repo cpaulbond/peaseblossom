@@ -1397,7 +1397,7 @@ Those fixed while Phase 18 was current, 8-10, are in
     `:=`, two-dimensional, of a field, of a local, in a set and in a call
     through a procedure variable), also in `test/vax-suite.list`.
 
-19. **`vax-coroutines-asts` depends on how fast the guest runs**. Found
+19. **`vax-coroutines-asts` depends on how fast the guest runs** [fixed]. Found
     2026-11-14, in Tasks Phase 9's gate: with atla busy with `make check`
     and three hosts' copies, the objects way printed "collections during
     the run: 2" where the fixture expects "3 or more"; the macro32 way,
@@ -1408,9 +1408,14 @@ Those fixed while Phase 18 was current, 8-10, are in
     the main loop goes on until it has both its batches and 3 collections,
     so the count is a condition of the run's end, not of its speed.
     Seen again 2026-11-14 in Phase 10's gate, the objects way on atla,
-    with a rerun that passed.
+    with a rerun that passed, and 2026-11-16 in bug 22's full run.
+    Fixed 2026-11-16: the main loop goes on past its 200 batches until
+    there have been 3 collections and 10 lists of the coroutines, but
+    never past 2000 batches (about 20 s of the guest's clock), so that a
+    run that can't get them still ends and prints its counts rather than
+    hanging. The expected output is unchanged.
 
-20. **TaskInput takes a failed mailbox read for the end of the input**.
+20. **TaskInput takes a failed mailbox read for the end of the input** [fixed].
     Found 2026-11-14, in Tasks Phase 12's `vax-tasks-examples`: a
     feeder's mailbox made with a maximum message of 64 bytes (`$CREMBX`)
     gave the spawned Clock "end of input" at its first read, before
@@ -1423,6 +1428,17 @@ Those fixed while Phase 18 was current, 8-10, are in
     with the device class), and make a failure other than the end of
     file an error, not the end. The status the read returns is still to
     be seen.
+    Seen 2026-11-16, by a probe on the guest: a `$QIOW` read asking for
+    more than a mailbox's largest message (512 or 65 of a 64-byte
+    mailbox) fails at the call itself with SS$_MBTOOSML (412), IOSB
+    untouched, and leaves the message queued, so a read of 64 then gets
+    it; `$GETDVIW`'s DVI$_DEVBUFSIZ gives the 64, by name or by channel.
+    Fixed the same day: `Choose` asks a mailbox for DVI$_DEVBUFSIZ, and
+    `ReadRecord` reads at most that, or 512 if it is larger. Any other
+    failure stays the end of the input, not an error: the interface has
+    only `Done` to say so, and `rtl/llvm/TaskInput.Mod` takes an error
+    for the end too. `vax-tasks-examples`' ClockFeeder makes its mailbox
+    with 64-byte messages again, which is the regression test.
 
 21. **[fixed] valgrind's memcheck can't follow a program's coroutines**. Found
     2026-11-15 by posockets (`~/Repos/Oberon/posockets`), Phase 4, with
@@ -1483,6 +1499,22 @@ Those fixed while Phase 18 was current, 8-10, are in
     `EXE$GL_ABSTIM_TICS` (checked). `vax-tasks-time` checks that `Now`
     never goes back over 10000 reads, and moves within 20 ms of the
     system time over a 500 ms sleep.
+
+23. **TaskInput on POSIX takes a read that EINTR interrupts for the end
+    of the input** [fixed]. Found 2026-11-16, while weighing an error
+    report for bug 20: `doc/developer/tasks.md` said `Platform`'s C
+    retries a read that EINTR interrupts, but `PlatformRead` retries
+    nothing (only `PlatformWrite` does), and `Fill` set `atEnd` on any
+    failure, so a signal caught by a handler installed without
+    `SA_RESTART`, arriving while the read blocked, ended the program's
+    input for good. Unlikely, since the read follows a poll that found
+    the descriptor readable, but possible if another process takes the
+    data between them. Fixed the same day: `Fill` waits and reads again
+    after EINTR. Checked with strace, which made the first read of
+    standard input fail with EINTR: before, `input lines` printed only
+    `end`; after, every line. `llvm-tasks-input` now makes that check
+    where strace can inject faults, and skips it, saying so, elsewhere.
+    VMS has no EINTR, so `rtl/vax/TaskInput.Mod` is unchanged.
 
 ## Ongoing library enhancements
 

@@ -488,8 +488,10 @@ what has been typed.
 2. **POSIX** (`rtl/llvm/TaskInput.Mod`, Oberon only):
    - The module keeps a 4 KiB buffer. When it is empty,
      `Tasks.AwaitReadable(0)`, then one `Platform.Read` of up to 4 KiB.
-     A count of 0, or an error, is the end of the input. `Platform`'s C
-     already retries a read that EINTR interrupts.
+     A count of 0, or an error, is the end of the input, but not EINTR:
+     after a read that a caught signal interrupts it waits and reads
+     again. `Platform`'s C retries only a write (`PLAN.md`, "Ongoing bug
+     fixing", 23).
    - `O_NONBLOCK` is never set: descriptor 0 is shared with the shell,
      and the flag would outlive the program.
    - A terminal in canonical mode is readable only once a line is
@@ -504,7 +506,9 @@ what has been typed.
    found by `$GETDVIW DVI$_DEVCLASS` at the first read:
    - **A terminal or a mailbox**: `$ASSIGN` `SYS$INPUT`. Each record is
      read by a `$QIO` into a 512-byte buffer, with an AST that posts an
-     `Event` the reading task awaits.
+     `Event` the reading task awaits. A mailbox read asks for no more
+     than its largest message (`DVI$_DEVBUFSIZ`): a `$QIO` asking for
+     more fails with `SS$_MBTOOSML` (`PLAN.md`, "Ongoing bug fixing", 20).
      - A record gets a line feed after it, except a terminal read ended
        by a full buffer (terminator size 0, I/O manual 8.5). The rest of
        such a line comes with the next read.
@@ -513,6 +517,8 @@ what has been typed.
        is Ctrl/Z (1AX) is the end as well, as RMS takes it.
      - A mailbox message longer than 512 bytes is cut short
        (`SS$_BUFFEROVF`).
+     - Any other failure is the end of the input too, as an error is on
+       Unix.
    - **Anything else** (a disk file, a batch job's input, `NL:`):
      `Platform.Read(StdIn)`, synchronously, as `In` does. It blocks
      every task while RMS reads, as decision 11 says of a disk read.
@@ -591,9 +597,9 @@ A pofltk example, from Phase 7.4, goes into pofltk's own repository,
 not poc's.
 
 Done 2026-11-14. On the guest a mailbox stands in for the terminal:
-`ClockFeeder`, a subprocess, feeds `Clock` its commands, and the
-mailbox's messages must hold TaskInput's 512-byte read (`PLAN.md`,
-"Ongoing bug fixing", 20).
+`ClockFeeder`, a subprocess, feeds `Clock` its commands. The
+mailbox's messages had to hold TaskInput's 512-byte read until
+`PLAN.md`'s bug 20 was fixed (2026-11-16); they are 64 bytes now.
 
 ### Phase 13: Documents and packaging
 

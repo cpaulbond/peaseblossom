@@ -15,7 +15,13 @@ MODULE CoroutineAsts;
 
   CONST
     batchNodes = 16;
-    wanted = 200; (* batches checked before the end *)
+    wanted = 200; (* batches checked before the end, at least *)
+    (* and the run goes on until it has 3 collections and 10 lists too,
+       since how many come in wanted batches, about 2 s of the guest's
+       clock, follows from how fast the VAX (SIMH) runs; but never past
+       limit batches, so that a run that can't get them still ends and
+       shows its counts *)
+    limit = 2000;
     ownNodes = 500;
     step = 50; (* a coroutine's nodes between Transfers *)
     tick = -100000; (* 10 ms, as a delta time in 100-ns units *)
@@ -94,7 +100,9 @@ BEGIN
   Coroutines.Init(B, Coroutines.DefaultStackSize, coroutines[2]);
   collectionsBefore := GarbageCollectedHeap.CollectionCount();
   status := SetTimer(0, tick, Tick, 0, 0);
-  WHILE checked < wanted DO
+  WHILE (checked < wanted)
+        OR ((GarbageCollectedHeap.CollectionCount() - collectionsBefore < 3) OR (lists < 10))
+           & (checked < limit) DO
     Coroutines.Transfer(coroutines[0], coroutines[1]);
     wasEnabled := AsynchronousTraps.Disable();
     taken := incoming; incoming := NIL;

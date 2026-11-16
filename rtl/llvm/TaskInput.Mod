@@ -15,7 +15,9 @@ MODULE TaskInput;
      The module keeps a buffer of 4 KiB. When it is empty, the task waits
      by Tasks.AwaitReadable(0) while the others run, then reads up to 4 KiB
      by one Platform.Read; a count of 0, or an error, is the end of the
-     input, for good. O_NONBLOCK is never set: descriptor 0 is shared with
+     input, for good - but not EINTR, a signal caught during the read,
+     after which it waits and reads again (PLAN.md, "Ongoing bug fixing",
+     23). O_NONBLOCK is never set: descriptor 0 is shared with
      the shell, and the flag would outlive the program. A terminal in
      canonical mode is readable once a line is complete, a pipe once data
      is there, and a regular file or /dev/null always, so the read does
@@ -49,12 +51,15 @@ MODULE TaskInput;
 
   (* Refills the buffer; it stays empty at the end of the input *)
   PROCEDURE Fill;
-    VAR n: LONGINT;
+    VAR n: LONGINT; e: Platform.ErrorCode;
   BEGIN
     length := 0; position := 0;
     IF ~atEnd THEN
-      Tasks.AwaitReadable(Platform.StdIn);
-      IF (Platform.Read(Platform.StdIn, SYSTEM.ADR(buffer), bufferSize, n) = 0) & (n > 0) THEN
+      REPEAT
+        Tasks.AwaitReadable(Platform.StdIn);
+        e := Platform.Read(Platform.StdIn, SYSTEM.ADR(buffer), bufferSize, n)
+      UNTIL ~Platform.Interrupted(e);
+      IF (e = 0) & (n > 0) THEN
         length := n
       ELSE
         atEnd := TRUE

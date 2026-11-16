@@ -7,9 +7,11 @@ MODULE ClockFeeder;
      stop an end of file ends the subprocess's DCL, which reads its next
      command from the same mailbox. Each write waits until it has been
      read; the feeder then waits for the subprocess to end. The mailbox's
-     messages may be as long as TaskInput's read of 512 bytes: with a
-     smaller maximum that read fails, TaskInput takes it as the end, and
-     the subprocess's DCL reads the commands, STOP among them. *)
+     messages are at most 64 bytes, less than TaskInput's buffer of 512,
+     so that TaskInput must read no more than the mailbox's largest
+     message: a read of more fails (SS$_MBTOOSML), and before bug 20 was
+     fixed TaskInput took that for the end, so the subprocess's DCL read
+     the commands, STOP among them (PLAN.md, bug 20). *)
   IMPORT SYSTEM, Out;
 
   CONST
@@ -63,7 +65,7 @@ MODULE ClockFeeder;
   END Write;
 
 BEGIN
-  Check("$CREMBX", CreateMailbox(0, channel, 1024, 2048, 0, 0, "CLOCK_MBX"));
+  Check("$CREMBX", CreateMailbox(0, channel, 64, 2048, 0, 0, "CLOCK_MBX"));
   Check("$CLREF", ClearFlag(spawnEfn));
   Check("LIB$SPAWN", Spawn("CLOCK 2", "CLOCK_MBX", "CLOCK.LOG", spawnNoWait,
     NIL, pid, completion, spawnEfn));
