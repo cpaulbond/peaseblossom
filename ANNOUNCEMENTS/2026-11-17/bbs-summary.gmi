@@ -1,0 +1,13 @@
+# Announcing Peaseblossom: an Oberon-2 compiler, and libraries and programs for it and for voc
+
+This software was developed with the aid of AI.
+
+Peaseblossom's poc is an Oberon-2 compiler with an LLVM backend for Linux, FreeBSD, OpenBSD and NetBSD, and a VAX backend for VAX/VMS 5.5-2. I wrote it largely because I wanted a more modern language than the limited ones on the VAX system I maintain.
+
+With it come libraries: bindings to libfyaml (YAML), FLTK (GUIs) and libtls, plus dates and times, Unix services, sockets and SQL databases. There's also pogemini, a Gemini server written in Oberon-2 and built on those libraries. A few of the projects work with Vishap Oberon (voc) as well. All are BSD 3-Clause licensed.
+
+The full announcement, with a link to each project:
+
+=> gemini://consp.org/blog/2026/2026-11-17-announcing-peaseblossom-an-oberon-2-compiler-and-libraries-and-programs-for-it-and-for-voc.gmi Announcing Peaseblossom (full post)
+=> https://github.com/tkurtbond/peaseblossom poc on GitHub
+=> https://github.com/tkurtbond/pogemini pogemini on GitHub
