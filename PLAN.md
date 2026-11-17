@@ -1792,7 +1792,9 @@ Those done while Phase 15 was current, 1 and 2, are in
 
     Child processes have a second user already, so the trigger in
     decision 3 and step 4, "when a second program needs them", is
-    arguably met; whether to start pounix now is the user's to decide.
+    arguably met; the user decided to start pounix at once
+    (2026-11-16), as `~/Repos/Oberon/pounix`, with the modules
+    `UnixErrors`, `UnixUsers`, `UnixFiles` and `UnixProcesses`.
 
     Ignoring SIGPIPE stays in posockets, where it matters.
 
@@ -1857,6 +1859,11 @@ Those done while Phase 15 was current, 1 and 2, are in
        valgrind as well) and on all five BSD hosts.
     4. The Unix library, as a project of its own, when the next program
        needs one of its services.
+
+       [started 2026-11-16] pounix (`~/Repos/Oberon/pounix`, its
+       PLAN.md): Phases 1 to 4, all four modules, done on Linux the
+       same day; the BSD port, install, and pogemini's move to it to
+       follow.
 
 ## Ongoing language enhancements
 
