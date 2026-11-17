@@ -151,7 +151,63 @@ before any of these libraries.
 | `HashCode.Mod` | Hash functions for the basic types | Small; C part |
 | `Exception.Mod`, `Object.Mod`, `Object/Boxed.Mod` | The run-time side of exceptions, `STRING` and boxed values | Only with the language features of section 1 |
 
-## 3. Where to look first
+## 3. Threads
+
+oo2c has optional POSIX threads, built only with `configure
+--enable-threads=pthreads` (`aclocal.m4`, `OOC_ARG_ENABLE_PTHREADS`:
+`HAVE_LIBPTHREAD`, `GC_THREADS`, `-D_REENTRANT`). The installed 2.2.2
+was built without them (`lib/pkginfo.xml`: `HAVE_LIB_PTHREAD` is
+`FALSE`).
+
+- **Interface.** `lib/src/Thread/PThread.Mod` is a `FOREIGN "C"` module
+  marked "experimental and preliminary". `Thread` is an abstract class
+  with an abstract `Run`, plus `Start`, `Join` and `CurrentThread()`.
+  `Mutex` has `Lock`, `Unlock`, `TryLock` and `Destroy`. `Condition` has
+  `Signal`, `Broadcast`, `Wait` and `TimedWait`. `Thread:Semaphore`
+  wraps `sem_t`. Errors are raised as `PThread.Error`, a checked
+  exception that carries the errno value.
+- **`PThread.c`.**
+  - `Start` blocks every signal around `pthread_create`, so only the
+    original thread receives signals.
+  - `RunWrapper` stores the thread object in pthread thread-specific
+    data, where `CurrentThread` finds it.
+  - Mutexes and conditions are atomic (unscanned) collector blocks.
+  - `CheckError`'s `switch` lacks `break` after its `ESRCH`, `EDEADLK`,
+    `EBUSY` and `ENOSYS` cases.
+- **Exception state.** A thread's current exception and `TRY` context
+  stack are in a field of the thread object, not in thread-local
+  storage, because the collector does not scan thread-local storage.
+  `Exception.c` reaches it through `GetThreadState()`, which without
+  threads returns a single static state.
+- **The collector does the real work.** With `GC_THREADS`, `gc.h`
+  redirects `pthread_create` to Boehm's wrapper. Boehm then stops every
+  thread and scans its stack and registers conservatively. oo2c's
+  runtime adds nothing more for threads.
+- **Thread safety.** `lib/src/liboo2c.Mod` marks the modules with
+  mutable global state: `RT0`, `Files`, `IO:FileChannel`, `In`, `Out`,
+  `Err`, `Log`, `RandomNumbers`, `Termination` and `PosixFileDescr`. It
+  warns that `Files` and `FileChannel` can corrupt their lists of
+  temporary files under concurrent open and close. No object is safe
+  unless its documentation says so.
+
+**For poc.** Threads are cheap in oo2c only because it borrows a
+collector that already handles them. poc's collector is its own and
+precise, the heap has no locks, and the runtime keeps global state
+(`AGENTS.md`, "Threads and signal handlers"). Following oo2c would take:
+
+- a stop-the-world collector that scans every thread's stack, including
+  the hidden pointer parameters of nested procedures;
+- a heap lock, or an allocation buffer for each thread;
+- an audit of the runtime modules like oo2c's list above;
+- DECthreads (CMA) on VAX/VMS 5.5-2.
+
+`Coroutines` and `Tasks` were chosen instead
+(`doc/research/concurrency-survey.md`). One point applies even without
+threads: if poc adopts exceptions (section 1, item 2), the current
+exception and the handler stack must live where the collector scans,
+and must be kept for each coroutine.
+
+## 4. Where to look first
 
 If one candidate is taken up, the order of reading in the oo2c tree:
 
