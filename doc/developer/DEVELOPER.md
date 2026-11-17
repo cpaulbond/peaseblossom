@@ -166,6 +166,13 @@ the architecture matters (calls, arithmetic, memory layout, the runtime's C
 calls, the collector) and at the end of each phase. What it finds is fixed
 in a later commit.
 
+A commit that changes only text nothing builds or tests (`PLAN.md`,
+`AGENTS.md`, this file, `doc/research` and `doc/history`, which
+`make doc-all` only renders) needs no host run, since the hosts would
+check unchanged code. Anything the build or the tests read still does:
+source, the runtime, `tools/`, the fixtures, the guides and `poc(1)`
+(fixtures such as `doc-poc-options` check their text), and packaging.
+
 `tools/check-hosts` (`make check-hosts`) runs these checks on every host
 at once and prints one summary. This host runs `make check check-opt2`
 in the tree. Every other host gets a fresh copy of the tree in

@@ -1643,7 +1643,7 @@ Those done while Phase 15 was current, 1 and 2, are in
     user on 2026-11-16, and revised the same day once poDateTime was
     found to have the clocks. The names were chosen by the user on
     2026-11-16: `StopRequests` for the module and **pounix** for the
-    Unix library. Steps 1 to 3 are done; 4 is later.
+    Unix library. All four steps are done (2026-11-16).
 
     **Why.** The programs built on poc so far each carry C for the same
     operating-system services, because poc can't name `struct stat`,
@@ -1860,10 +1860,49 @@ Those done while Phase 15 was current, 1 and 2, are in
     4. The Unix library, as a project of its own, when the next program
        needs one of its services.
 
-       [started 2026-11-16] pounix (`~/Repos/Oberon/pounix`, its
-       PLAN.md): Phases 1 to 4, all four modules, done on Linux the
-       same day; the BSD port, install, and pogemini's move to it to
-       follow.
+       [done 2026-11-16, with poc 0.14.0] pounix
+       (`~/Repos/Oberon/pounix`, its PLAN.md), with the modules
+       `UnixErrors`, `UnixUsers` (`Root`, `Become`), `UnixFiles`
+       (`Resolve`, `OpenRead`, `KindOf`, `Read`, `Write`, `Close`) and
+       `UnixProcesses` (a command as a list of arguments, with no
+       shell; `Start`, `Wait`, `Signal`, pipes):
+       - **pounix** (c6070a7): Phases 1 to 6. Each module is tested on
+         Linux and checked under valgrind. `gmake test` and the
+         root-only test pass on all five BSD hosts. `make install` was
+         checked by building README's example from an installed copy.
+         Two differences between systems were found, both in the tests:
+         - A FIFO no writer has yet opened reads as `EAGAIN` on
+           FreeBSD, and as the end of the file on the other systems.
+         - FreeBSD and OpenBSD have no `/proc/self/fd`, so the
+           close-on-exec checks now ask a child shell to redirect from
+           the descriptor instead.
+       - **pogemini** (dbf5250) keeps no C of its own:
+         - `GemUser` gives way to `UnixUsers`, and `GemFiles.c` to
+           `UnixFiles`. The rules for serving files are unchanged, now
+           in Oberon: under the root once resolved, no hidden name, the
+           same failures counted as "not found", and the file opened
+           without following a final link. The root and hidden-name
+           checks were each tested by taking them out, which made
+           TestFiles fail.
+         - `GemCert` runs `/bin/sh` through `UnixProcesses`, with a
+           fixed script and its values as `$1` to `$3`, in place of a
+           quoted command line through `Platform.System`. So a
+           certificate directory may now have `'` in its name.
+         - `GemAccess`'s `Platform.GetTimeOfDay` became `Clocks.Now`
+           and `Instants.UnixSeconds`, as planned above (not pounix).
+
+         pogemini passed `make test` on Linux (299 checks) and on all
+         five BSD hosts.
+
+       Not moved, and why:
+       - The test helpers that start child processes, polibtls's
+         `test/TestPeers.c` and pogemini's `test/Child.c`, could use
+         `UnixProcesses`. But `TestPeers.ReadLine` and pogemini's tests
+         need a wait with a time limit, which pounix doesn't offer: it
+         is one of pounix's open questions, until a user asks.
+       - polibtls's `Tls.c` (whether a descriptor is non-blocking)
+         stays, as expected above, so polibtls doesn't depend on pounix for one
+         call.
 
 ## Ongoing language enhancements
 
