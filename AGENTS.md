@@ -513,6 +513,21 @@ still stops every task. Traps 19 (all blocked, no timer, descriptor or `Await`) 
 (misuse); on VMS no AST-level check (its cost), so a
 blocking call in an AST is undefined.
 
+## Branches (decided with the user 2026-11-16)
+
+Work goes on `main`; there is no long-lived dev branch. `main` already
+holds only checked work, since nothing is committed before `make check`
+on atla and the gate on cymoril, artos and alerik pass, and releases come
+from tags. Work of several commits, or a session working while another
+commits here, goes on a feature branch in its own worktree (`git
+worktree add ../Peaseblossom-<topic> -b <topic>`), merged into `main` when
+done, as `vax`, `vax-obj` and the Tasks work were: a branch in the same
+checkout does not separate two sessions (on 2026-11-16 two sessions'
+`PLAN.md` edits met in one tree). Two worktrees' gates at once compete
+for the VMs and the VAX guest's two accounts, so run one at a time.
+A dev branch fast-forwarded to `main` after rackhir passes would be
+added only if `main` should come to mean "passed on rackhir too".
+
 ## Project state
 
 Phases 0-15 of `PLAN.md` are complete (records in `doc/history/phases/` and
