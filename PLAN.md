@@ -1643,7 +1643,7 @@ Those done while Phase 15 was current, 1 and 2, are in
     user on 2026-11-16, and revised the same day once poDateTime was
     found to have the clocks. The names were chosen by the user on
     2026-11-16: `StopRequests` for the module and **pounix** for the
-    Unix library. Steps 1 and 2 are done; 3 and 4 are later.
+    Unix library. Steps 1 to 3 are done; 4 is later.
 
     **Why.** The programs built on poc so far each carry C for the same
     operating-system services, because poc can't name `struct stat`,
@@ -1718,7 +1718,11 @@ Those done while Phase 15 was current, 1 and 2, are in
     `Clocks.Now` and `TimeStrings`' ISO 8601 formatting run in a 16 KiB
     task on NetBSD and OpenBSD. On Unix `Clocks.Now` takes the UTC path
     (`clock_gettime`, no `localtime`); `TimeStrings`' stack use is not
-    yet measured.
+    yet measured. [done 2026-11-16: a probe used up a 16 KiB task's
+    stack in 256-byte frames until it hit the guard page, with and
+    without `Clocks.Now` and `TimeStrings.Instant`; they cost 3 frames
+    on NetBSD and OpenBSD, amd64 and i386, and 6 on FreeBSD and Linux,
+    so at most about 2 KiB.]
 
     **Candidate for `rtl` (decision 2): stop requests**, now
     `StopRequests` (done; below). It would catch the requests to stop and let the program
@@ -1748,6 +1752,47 @@ Those done while Phase 15 was current, 1 and 2, are in
       shell;
     - `realpath`, opening with flags, a file's kind, whether a
       descriptor is non-blocking.
+
+    **pounix's first contents: what pogemini's C becomes** (with the
+    user, 2026-11-16). The aim is that pogemini keeps no C of its own,
+    and that the next program takes these services from pounix rather
+    than from a copy of pogemini's C. The services go to pounix; what
+    is pogemini's policy stays in pogemini, rewritten in Oberon on
+    pounix:
+    - **To pounix:**
+      - users, all of `GemUser.c`: whether the process runs as root,
+        and becoming another user for good (`getpwnam`, then
+        `initgroups`, `setgid`, `setuid`, then a check that root can't
+        be regained); perhaps also looking up a user's IDs and home on
+        its own;
+      - `realpath` (`gemfiles_resolve`);
+      - files by descriptor, the general part of `GemFiles.c`: opening
+        with flags (`O_RDONLY`, `O_NONBLOCK`, `O_NOFOLLOW`,
+        `O_CLOEXEC`), a file's kind by `fstat` (regular, directory,
+        other), reading into a buffer with `EINTR` retried, closing,
+        and a failure's cause as a few kinds from `errno` (no such
+        file, not permitted, other);
+      - child processes: running a command from a list of arguments,
+        with no shell, then waiting for it or killing it, for
+        `GemCert`'s `openssl`, which now goes through the shell by
+        `Platform.System`. This already has more than one user: the C
+        helpers polibtls's `test/TestPeers.c` (`Spawn`, `Wait`,
+        `ReadLine`, `Kill`) and pogemini's `test/Child.c`.
+    - **Stays in pogemini, in Oberon:** a file must lie under the
+      capsule's root once resolved; a hidden name (beginning with ".")
+      is never served; which failures count as "not found" for Gemini
+      (`EACCES` among them); and the order `GemFiles` relies on:
+      resolve, check, then open with `O_NOFOLLOW` in case the last name
+      became a link in between.
+    - **Not pounix:** `GemAccess`'s `Platform.GetTimeOfDay` moves to
+      poDateTime's `Clocks`, missed in step 3; `Platform.getEnv` and
+      `Platform.IdentifyByName` are poc's and stay. polibtls's check
+      that a descriptor is non-blocking (`Tls.c`) probably stays too,
+      rather than make a library depend on pounix for one call.
+
+    Child processes have a second user already, so the trigger in
+    decision 3 and step 4, "when a second program needs them", is
+    arguably met; whether to start pounix now is the user's to decide.
 
     Ignoring SIGPIPE stays in posockets, where it matters.
 
@@ -1794,6 +1839,22 @@ Those done while Phase 15 was current, 1 and 2, are in
        in their next release. This raises the poc they need to the
        release that has the module, so do it when they need a new poc
        anyway.
+
+       [done 2026-11-16, with poc 0.14.0 and poDateTime 5ae9a47] Each
+       now needs poDateTime, installed by the same poc, and stops
+       `make` with a message (pogemini's `make deps`) without it.
+       - **polibtls** (cfb12e0): connections' deadlines take
+         `Clocks.Monotonic`, in place of its own `CLOCK_MONOTONIC`; its
+         example GeminiHello stops on SIGINT or SIGTERM through
+         `StopRequests`, finishing its connections, which `TestGemini`
+         checks with a request in progress.
+       - **posockets** (08b6e48): `Sockets.Now`, and so the deadlines,
+         take `Clocks.Monotonic`; its least poc stays 0.13.0.
+       - **pogemini** (bc1aa0d): `GemServer.c` is gone. `Listen` calls
+         `StopRequests.Catch`, and the log's time is `Clocks.Now` and
+         `TimeStrings.Instant`, in the same format.
+       Each passed its tests on Linux (polibtls and posockets under
+       valgrind as well) and on all five BSD hosts.
     4. The Unix library, as a project of its own, when the next program
        needs one of its services.
 
