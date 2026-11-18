@@ -27,6 +27,10 @@ Real 76997F96 done
 HugeCard 18446744073709551615 done
 HugeCard FEDCBA9876543210 done
 HugeCard 0 not done
+Int 0 not done
+Int -32768 done
+LongInt 0 not done
+LongInt -2147483648 done
 LongReal at the end not done
 Name at the end not done
 Char at the end not done

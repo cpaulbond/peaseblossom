@@ -39,8 +39,10 @@ MODULE Files;
      NetBSD, OpenBSD and FreeBSD (the BSD half from memory, to be confirmed
      on those systems), with no conditional compilation to choose between
      them. fopen takes a mode *string*, and fseek a `long`, which
-     is a word on every one of them - so a file is limited to what a
-     LONGINT holds (2 GB under the -O2 size model), as in voc.
+     is a word on every one of them - so a file is limited to what both a
+     LONGINT and a word hold (2 GB under the -O2 size model, as in voc, and
+     on 32-bit systems): a position past a word is "seek failed", not cut
+     to a word (PLAN.md, "Ongoing bug fixing", 26).
 
      NEW AND REGISTER. New creates nothing on disk. The first write (or
      Close, or Register) creates a temporary file in the directory of the
@@ -116,6 +118,9 @@ MODULE Files;
     (* the longest path and file name the system takes (Platform's) *)
     MaxPathLength-, MaxNameLength-: INTEGER;
     temporaryCount: LONGINT;
+    (* MAX(SYSTEM.ADDRESS), the furthest fseek reaches, set by the module
+       body: MAX of SYSTEM.ADDRESS is not taken yet *)
+    maxOffset: SYSTEM.ADDRESS;
     searchPath: POINTER TO ARRAY OF CHAR; (* NIL: the current directory *)
     home: FileName;
 
@@ -259,7 +264,10 @@ MODULE Files;
   PROCEDURE PositionStream(f: File; position: LONGINT; use: INTEGER);
   BEGIN
     IF (f.mode # use) OR (f.position # position) THEN
-      IF FSeek(f.stream, SYSTEM.VAL(SYSTEM.ADDRESS, position), seekSet) # 0 THEN Fail("seek failed", f) END;
+      IF (position > maxOffset)
+         OR (FSeek(f.stream, VAL(SYSTEM.ADDRESS, position), seekSet) # 0) THEN
+        Fail("seek failed", f)
+      END;
       f.position := position;
       f.mode := use
     END
@@ -838,6 +846,9 @@ MODULE Files;
   END WriteNum;
 
 BEGIN
+  maxOffset := 1;
+  WHILE maxOffset > 0 DO maxOffset := maxOffset * 2 END; (* the last wraps *)
+  maxOffset := maxOffset - 1; (* wraps too *)
   MaxPathLength := Platform.MaxPathLength();
   MaxNameLength := Platform.MaxNameLength();
   Platform.GetEnv("HOME", home)

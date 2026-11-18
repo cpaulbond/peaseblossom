@@ -39,8 +39,9 @@ MODULE In;
        hexadecimal digits followed by H, either with a leading minus sign;
        a run of digits with letters in it and no H is Done = FALSE, value 0
        (25).
-     - Int and LongInt narrow the number the way voc's do, to the low bits,
-       not by trapping. *)
+     - Int and LongInt take a number that does not fit their variable as
+       not a number: Done FALSE, value 0. voc's keep its low bits, with
+       Done TRUE (PLAN.md, "Ongoing bug fixing", 25). *)
 
   IMPORT SYSTEM, Platform, FormattedInput;
 
@@ -118,18 +119,28 @@ MODULE In;
     Done := FormattedInput.HugeInt(input, h)
   END HugeInt;
 
+  (* HugeInt, for an INTEGER: a number outside INTEGER's range is read
+     past, but is Done FALSE, i 0. *)
   PROCEDURE Int*(VAR i: INTEGER);
     VAR h: HUGEINT;
   BEGIN
     HugeInt(h);
-    i := SYSTEM.VAL(INTEGER, h)
+    IF Done & ((h < MIN(INTEGER)) OR (h > MAX(INTEGER))) THEN
+      Done := FALSE; h := 0
+    END;
+    i := VAL(INTEGER, h)
   END Int;
 
+  (* HugeInt, for a LONGINT: a number outside LONGINT's range is read
+     past, but is Done FALSE, i 0. *)
   PROCEDURE LongInt*(VAR i: LONGINT);
     VAR h: HUGEINT;
   BEGIN
     HugeInt(h);
-    i := SYSTEM.VAL(LONGINT, h)
+    IF Done & ((h < MIN(LONGINT)) OR (h > MAX(LONGINT))) THEN
+      Done := FALSE; h := 0
+    END;
+    i := VAL(LONGINT, h)
   END LongInt;
 
   (* An unsigned integer (AGENTS.md, "Unsigned integer types"): decimal

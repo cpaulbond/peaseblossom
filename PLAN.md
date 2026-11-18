@@ -1581,7 +1581,7 @@ Those fixed while Phase 18 was current, 8-10, are in
     `TZ=Europe/London`.
 
 25. **`In.Int`, `In.LongInt`, `InStr.Int` and `InStr.LongInt` truncate a
-    number too large for their variable and still set `Done`.** Found
+    number too large for their variable and still set `Done`** [fixed]. Found
     2026-11-18, surveying the bindings' integer conversions
     (`doc/developer/sized-integers-and-cardinals-reviewd.md`). Each reads
     a `HUGEINT` and stores `SYSTEM.VAL(INTEGER, h)` or
@@ -1589,10 +1589,17 @@ Those fixed while Phase 18 was current, 8-10, are in
     `rtl/llvm/InStr.Mod:81, 90`, `rtl/vax/In.Mod:125, 132`). Under `-O2`,
     `In.Int(i)` reading `70000` gives `i = 4464` with `In.Done` TRUE
     (reproduced on atla). A value that does not fit should leave
-    `Done` FALSE, as a malformed number does.
+    `Done` FALSE, as a malformed number does. Fixed 2026-11-18, in both
+    back ends' `In` and `InStr`: a number outside the variable's range is
+    Done FALSE, value 0, as one that is not a number; `In` has read past
+    it, `InStr` leaves `pos` where it was. This was a documented choice,
+    voc's (`In.Mod`'s list of differences said Int and LongInt keep the
+    low bits); the list now says poc's differ. `llvm-in-extra` checks
+    `In` under `-O2`, `llvm-instr` `InStr` under both models, and their
+    VAX twins the same on the guest.
 
 26. **`Files` on 32-bit targets truncates a seek position of 2^32 or
-    more, so it seeks to the wrong place.** Found 2026-11-18, in the same
+    more, so it seeks to the wrong place** [fixed]. Found 2026-11-18, in the same
     survey; from the code, not yet reproduced (it needs an i386 host and
     a file over 4 GiB). `Files.PositionStream`
     (`rtl/llvm/Files.Mod:262`) passes `SYSTEM.VAL(SYSTEM.ADDRESS,
@@ -1602,7 +1609,62 @@ Those fixed while Phase 18 was current, 8-10, are in
     "seek failed" trap). A file's length is capped at `MAX(LONGINT)`,
     not `MAX(SYSTEM.ADDRESS)`. Either `fseeko`/`ftello` with a 64-bit
     `off_t` through `Files.c`, or a check that fails a position above
-    what `long` holds.
+    what `long` holds. Fixed 2026-11-18 with the check: `PositionStream`
+    fails ("seek failed") a position above the largest word, so a file
+    is limited to what both a `LONGINT` and a `long` hold, as `Files`'
+    header now says (`OpenOld` already refused a longer file, whose
+    `ftell` fails). Large files on 32-bit systems would need
+    `fseeko`/`ftello` and, on Linux, `_FILE_OFFSET_BITS=64` for `fopen`
+    and `fwrite` too; not done. Not reproduced, for the reason above.
+
+27. **`MAX(SYSTEM.ADDRESS)` and `MIN(SYSTEM.ADDRESS)` are refused** ("MAX/MIN
+    requires a basic type or SET"). Found 2026-11-18, fixing bug 26.
+    `AGENTS.md` makes `ADDRESS` an integer type, and `MAX`/`MIN` take
+    `SYSTEM.CARDn`, `SYSTEM.INTn` and even `SYSTEM.CARD`, as wide as
+    `ADDRESS` (checked), but not `ADDRESS` itself.
+    `GarbageCollectedHeap` and now `Files` compute it in their module
+    bodies by doubling until the value wraps.
+
+28. **The collector frees an object of a record with no fields while it
+    is still reachable, on 64-bit targets.** Found 2026-11-18 by
+    pogeminilib (`~/Repos/Oberon/pogeminilib`, its PLAN.md, Phase 4),
+    with 0.14.0 under `-OC` on Fedora 44 (x86-64): an abstract
+    `Waiter`, an extension of an empty record held in a global, was
+    swept, and a later method call on it crashed. `Allocate`
+    (`rtl/llvm/GarbageCollectedHeap.Mod`) takes a `dataSize` of 0, and
+    `BlockBytesFor(0)` is the two header words alone, `2 * word`: 16 on
+    a 64-bit target, exactly one granule. The data address, block + 2
+    words, is then the next block's start, so `MarkCandidate`'s
+    `FindBlock` finds that block for it and marks it, and the empty
+    object's own block stays unmarked and is swept. On a 32-bit target
+    the words are 8 bytes, rounded up to the 16-byte granule, so the
+    address stays inside its block (from the code; not run on i386).
+    Shown by
+    this program: after the collections the empty record's header
+    reads free (64), the one-field record's in use (34), and `e.Hi()`
+    segfaults:
+
+    ```
+    MODULE RD;
+    IMPORT SYSTEM, Out;
+    TYPE E = POINTER TO ED; ED = RECORD END;
+      F = POINTER TO FD; FD = RECORD x: LONGINT END;
+    VAR e: E; f: F; i: LONGINT; c: POINTER TO ARRAY OF CHAR; h: SYSTEM.ADDRESS;
+    PROCEDURE (e: E) Hi(): INTEGER; BEGIN RETURN 1 END Hi;
+    BEGIN
+      NEW(e); NEW(f);
+      FOR i := 1 TO 200 DO NEW(c, 300000) END; c := NIL;
+      SYSTEM.GET(SYSTEM.VAL(SYSTEM.ADDRESS, e) - 16, h); Out.Int(h, 0); Out.Ln;
+      SYSTEM.GET(SYSTEM.VAL(SYSTEM.ADDRESS, f) - 16, h); Out.Int(h, 0); Out.Ln;
+      Out.Int(e.Hi(), 0); Out.Ln
+    END RD.
+    ```
+
+    A likely fix, not tried: `BlockBytesFor` (or `Allocate`) gives a
+    `dataSize` of 0 at least one byte, so every object's data address
+    lies inside its own block. Whether anything else allocates 0 bytes
+    (`SYSTEM.NEW(p, 0)`) is not checked. pogeminilib works round it with
+    a field in the empty record.
 
 ## Ongoing library enhancements
 

@@ -73,22 +73,32 @@ MODULE InStr;
     END
   END HugeInt;
 
-  (* HugeInt, narrowed to the low bits of an INTEGER, as In.Int: 0 if there
-     is nothing left to read *)
+  (* HugeInt, for an INTEGER, as In.Int: 0 if there is nothing left to
+     read; a number outside INTEGER's range is Done FALSE, i 0, and pos
+     stays where it was. *)
   PROCEDURE Int*(VAR i: INTEGER; s-: ARRAY OF CHAR; VAR pos: LONGINT);
-    VAR h: HUGEINT;
+    VAR h: HUGEINT; start: LONGINT;
   BEGIN
+    start := pos;
     HugeInt(h, s, pos);
-    i := SYSTEM.VAL(INTEGER, h)
+    IF Done & ((h < MIN(INTEGER)) OR (h > MAX(INTEGER))) THEN
+      Done := FALSE; h := 0; pos := start
+    END;
+    i := VAL(INTEGER, h)
   END Int;
 
-  (* HugeInt, narrowed to the low bits of a LONGINT, as In.LongInt: 0 if
-     there is nothing left to read *)
+  (* HugeInt, for a LONGINT, as In.LongInt: 0 if there is nothing left to
+     read; a number outside LONGINT's range is Done FALSE, i 0, and pos
+     stays where it was. *)
   PROCEDURE LongInt*(VAR i: LONGINT; s-: ARRAY OF CHAR; VAR pos: LONGINT);
-    VAR h: HUGEINT;
+    VAR h: HUGEINT; start: LONGINT;
   BEGIN
+    start := pos;
     HugeInt(h, s, pos);
-    i := SYSTEM.VAL(LONGINT, h)
+    IF Done & ((h < MIN(LONGINT)) OR (h > MAX(LONGINT))) THEN
+      Done := FALSE; h := 0; pos := start
+    END;
+    i := VAL(LONGINT, h)
   END LongInt;
 
   (* An unsigned integer, as In.Card: decimal digits, or hexadecimal digits

@@ -34,6 +34,8 @@ then Name: pos 6 Done 12ab
 then Int: pos 8 Done  7
 1.5e: pos 0 not Done
 unended string: pos 0 not Done
+Int 9999999999: pos 0 not Done  0
+Int -32768: pos 7 Done -32768
 5.0E-01-2.5E+013.0E+00 three reals: pos 12 Done
 no 0X: pos 5 Done 12345
 then Char: pos 5 not Done

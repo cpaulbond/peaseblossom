@@ -1,7 +1,8 @@
 MODULE inextra;
   (* PLAN.md Phase 10 step 5, the parts of In specific to poc: HugeInt, hexadecimal
      and other numbers that are not, Name, real numbers read exactly (and
-     refused when they are not numbers), a carriage return before the line
+     refused when they are not numbers), Int and LongInt given a number that
+     does not fit, a carriage return before the line
      feed. test.sh feeds it input.txt. What it prints goes through Out. *)
   IMPORT In, Out, SYSTEM;
   VAR
@@ -11,6 +12,8 @@ MODULE inextra;
     name, line: ARRAY 16 OF CHAR;
     ch: CHAR;
     wide: HUGECARD;
+    i: INTEGER;
+    l: LONGINT;
 
   PROCEDURE Done;
   BEGIN
@@ -69,6 +72,14 @@ BEGIN
   In.HugeCard(wide); Out.String("HugeCard "); Out.Card(wide, 0); Done;
   In.HugeCard(wide); Out.String("HugeCard "); Out.CardHex(wide, 16); Done;
   In.HugeCard(wide); Out.String("HugeCard "); Out.Card(wide, 0); Done;
+  In.Line(line);
+
+  (* under -O2: a number that does not fit is not one (PLAN.md, "Ongoing
+     bug fixing", 25) *)
+  In.Int(i); Out.String("Int "); Out.Int(i, 0); Done;
+  In.Int(i); Out.String("Int "); Out.Int(i, 0); Done;
+  In.LongInt(l); Out.String("LongInt "); Out.Int(l, 0); Done;
+  In.LongInt(l); Out.String("LongInt "); Out.Int(l, 0); Done;
   In.Line(line);
 
   (* the end of the input *)

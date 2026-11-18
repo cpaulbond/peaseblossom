@@ -72,6 +72,10 @@ BEGIN
     InStr.Int(i, "  12ab 7", pos); Status("then Int"); Out.Int(i, 3); Out.Ln;
     pos := 0; InStr.Real(x, "1.5e", pos); Status("1.5e"); Out.Ln;
     pos := 0; InStr.String(word, '"unended', pos); Status("unended string"); Out.Ln;
+    (* a number that does not fit is not one, too (under both size models:
+       PLAN.md, "Ongoing bug fixing", 25) *)
+    pos := 0; InStr.Int(i, " 9999999999 5", pos); Status("Int 9999999999"); Out.Int(i, 3); Out.Ln;
+    pos := 0; InStr.Int(i, " -32768 5", pos); Status("Int -32768"); Out.Int(i, 7); Out.Ln;
     (* several numbers on one line, and on several *)
     pos := 0; InStr.Real(x, "0.5 -2.5E1 3", pos); Out.Real(x, 0);
     InStr.Real(x, "0.5 -2.5E1 3", pos); Out.Real(x, 0);

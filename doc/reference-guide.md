@@ -1342,8 +1342,10 @@ values, and lseek's off_t is 32 bits on 32-bit Linux but 64 on 32-bit
 NetBSD, OpenBSD and FreeBSD (the BSD half from memory, to be confirmed
 on those systems), with no conditional compilation to choose between
 them. fopen takes a mode *string*, and fseek a `long`, which
-is a word on every one of them - so a file is limited to what a
-LONGINT holds (2 GB under the -O2 size model), as in voc.
+is a word on every one of them - so a file is limited to what both a
+LONGINT and a word hold (2 GB under the -O2 size model, as in voc, and
+on 32-bit systems): a position past a word is "seek failed", not cut
+to a word (PLAN.md, "Ongoing bug fixing", 26).
 
 NEW AND REGISTER. New creates nothing on disk. The first write (or
 Close, or Register) creates a temporary file in the directory of the
@@ -2009,8 +2011,9 @@ Where this differs from voc's (the numbers are those of vishap-bugs,
   hexadecimal digits followed by H, either with a leading minus sign;
   a run of digits with letters in it and no H is Done = FALSE, value 0
   (25).
-- Int and LongInt narrow the number the way voc's do, to the low bits,
-  not by trapping.
+- Int and LongInt take a number that does not fit their variable as
+  not a number: Done FALSE, value 0. voc's keep its low bits, with
+  Done TRUE (PLAN.md, "Ongoing bug fixing", 25).
 ```
 
 ```oberon
@@ -2029,7 +2032,13 @@ MODULE In;
   (* An integer: an optional minus sign, then decimal digits, or
      hexadecimal digits (0-9, A-F) and an H. *)
   PROCEDURE HugeInt*(VAR h: HUGEINT);
+
+  (* HugeInt, for an INTEGER: a number outside INTEGER's range is read
+     past, but is Done FALSE, i 0. *)
   PROCEDURE Int*(VAR i: INTEGER);
+
+  (* HugeInt, for a LONGINT: a number outside LONGINT's range is read
+     past, but is Done FALSE, i 0. *)
   PROCEDURE LongInt*(VAR i: LONGINT);
 
   (* An unsigned integer (AGENTS.md, "Unsigned integer types"): decimal
@@ -2104,12 +2113,14 @@ MODULE InStr;
      nothing left to read, and is 0 if what there is is not a number. *)
   PROCEDURE HugeInt*(VAR h: HUGEINT; s-: ARRAY OF CHAR; VAR pos: LONGINT);
 
-  (* HugeInt, narrowed to the low bits of an INTEGER, as In.Int: 0 if there
-     is nothing left to read *)
+  (* HugeInt, for an INTEGER, as In.Int: 0 if there is nothing left to
+     read; a number outside INTEGER's range is Done FALSE, i 0, and pos
+     stays where it was. *)
   PROCEDURE Int*(VAR i: INTEGER; s-: ARRAY OF CHAR; VAR pos: LONGINT);
 
-  (* HugeInt, narrowed to the low bits of a LONGINT, as In.LongInt: 0 if
-     there is nothing left to read *)
+  (* HugeInt, for a LONGINT, as In.LongInt: 0 if there is nothing left to
+     read; a number outside LONGINT's range is Done FALSE, i 0, and pos
+     stays where it was. *)
   PROCEDURE LongInt*(VAR i: LONGINT; s-: ARRAY OF CHAR; VAR pos: LONGINT);
 
   (* An unsigned integer, as In.Card: decimal digits, or hexadecimal digits
