@@ -1580,6 +1580,30 @@ Those fixed while Phase 18 was current, 8-10, are in
     `GetClock` first in a 16 KiB task, with the local zone and with
     `TZ=Europe/London`.
 
+25. **`In.Int`, `In.LongInt`, `InStr.Int` and `InStr.LongInt` truncate a
+    number too large for their variable and still set `Done`.** Found
+    2026-11-18, surveying the bindings' integer conversions
+    (`doc/developer/sized-integers-and-cardinals-reviewd.md`). Each reads
+    a `HUGEINT` and stores `SYSTEM.VAL(INTEGER, h)` or
+    `SYSTEM.VAL(LONGINT, h)` (`rtl/llvm/In.Mod:118, 125`,
+    `rtl/llvm/InStr.Mod:81, 90`, `rtl/vax/In.Mod:125, 132`). Under `-O2`,
+    `In.Int(i)` reading `70000` gives `i = 4464` with `In.Done` TRUE
+    (reproduced on atla). A value that does not fit should leave
+    `Done` FALSE, as a malformed number does.
+
+26. **`Files` on 32-bit targets truncates a seek position of 2^32 or
+    more, so it seeks to the wrong place.** Found 2026-11-18, in the same
+    survey; from the code, not yet reproduced (it needs an i386 host and
+    a file over 4 GiB). `Files.PositionStream`
+    (`rtl/llvm/Files.Mod:262`) passes `SYSTEM.VAL(SYSTEM.ADDRESS,
+    position)` to `fseek`, whose offset is a C `long`: under `-OC` on
+    i386 a 64-bit `LONGINT` position is cut to 32 bits, so position
+    2^32 + k seeks to k, and one from 2^31 is a negative offset (a
+    "seek failed" trap). A file's length is capped at `MAX(LONGINT)`,
+    not `MAX(SYSTEM.ADDRESS)`. Either `fseeko`/`ftello` with a 64-bit
+    `off_t` through `Files.c`, or a check that fails a position above
+    what `long` holds.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
