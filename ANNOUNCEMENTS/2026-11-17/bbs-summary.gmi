@@ -1,3 +1,5 @@
+2026-11-17: gemini://bbs.geminispace.org/s/pascal/51545
+
 # Announcing Peaseblossom: an Oberon-2 compiler, and libraries and programs for it and for voc
 
 This software was developed with the aid of AI.

@@ -1,3 +1,5 @@
+2026-11-17: https://tkurtbond.github.io/posts/2026/11/17/announcing-peaseblossom-an-oberon-2-compiler-and-libraries-and-programs-for-it-and-for-voc/
+
 ============================================================================================
 Announcing Peaseblossom: an Oberon-2 compiler, and libraries and programs for it and for voc
 ============================================================================================

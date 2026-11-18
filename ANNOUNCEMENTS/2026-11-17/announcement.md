@@ -1,3 +1,5 @@
+2026-11-18: https://www.reddit.com/r/Oberon/s/CUrQS2ucZy
+
 # Announcing Peaseblossom: an Oberon-2 compiler, and libraries and programs for it and for voc
 
 This software was developed with the aid of AI.
