@@ -2265,7 +2265,7 @@ Those done while Phase 18 was current, 5-7, are in
       from both.
 
 13. Investigate: the collector turning off valgrind's error reporting
-    while it collects (the user, 2026-11-18; found in posockets and
+    while it collects [done] (the user, 2026-11-18; found in posockets and
     polibtls, putting their task tests under full memcheck now that
     bug 21 is fixed). The collector scans stacks conservatively, a
     coroutine's included, so memcheck reports the words it reads that
@@ -2278,11 +2278,13 @@ Those done while Phase 18 was current, 5-7, are in
     (`--track-origins`: stack allocations in `SocketTasks.Await` and
     `TestFileServer.Whole`), and it now needs a suppression file of its
     own (`test/TestFileServer.supp`).
-    - The same `DrainMarkStack` report is a real bug elsewhere: a record
-      copied whole from the stack into the heap carries its
+    - The same `DrainMarkStack` report was thought a real bug elsewhere:
+      a record copied whole from the stack into the heap carrying its
       uninitialised padding (pogeminilib, Phase 2). So the projects
-      keep it out of their shared `poc-gc.supp`, and a blanket
-      suppression would hide that bug.
+      keep it out of their shared `poc-gc.supp`. That diagnosis was
+      wrong: SROA had taken the record apart, and the words were
+      `Take`'s spill slots, read by the stack scan
+      (`doc/developer/collector-under-valgrind.md`).
     - The idea: wrap a collection in `VALGRIND_DISABLE_ERROR_REPORTING`
       / `VALGRIND_ENABLE_ERROR_REPORTING` (`rtl/llvm/valgrind.h`, as
       `Coroutines.c` already uses for bug 21). Or mark each word as
@@ -2296,6 +2298,25 @@ Those done while Phase 18 was current, 5-7, are in
         instructions when not under valgrind);
       - whether the projects' `poc-gc.supp` files and
         `TestFileServer.supp` can then go.
+    - Done (2026-11-18): under valgrind the stack scan (`MarkFromStack`,
+      and `MarkRange` for coroutines) reads each word through
+      `GarbageCollectedHeap.c`'s `DefinedWord`, which copies it and
+      marks the copy defined (`VALGRIND_MAKE_MEM_DEFINED`), so memcheck
+      reports nothing the scan reads and still reports every other use
+      of an undefined value; turning reporting off would hide errors
+      during a collection too. `UnderValgrind` is asked once; natively
+      GcBench runs 0.1% more instructions. `rtl/llvm/memcheck.h` is
+      valgrind 3.27.1's. Fixture `llvm-gc-valgrind`; pogeminilib's
+      `TestText` (whole-record copy restored) went from 700,877 errors
+      to 0, posockets' `TestFileServer` from 977 to 0, with no
+      suppressions. `doc/developer/collector-under-valgrind.md` has
+      the account.
+    - After a release with it: the projects drop their collector
+      suppressions (`test/poc-gc.supp` in pofltk, pogeminilib,
+      polibfyaml, polibtls, posockets and pounix, poDB's entries in
+      `test/valgrind.supp`, posockets' `test/TestFileServer.supp`),
+      and pogeminilib copies the record whole again and corrects its
+      note about padding.
 
 ## Open design questions
 

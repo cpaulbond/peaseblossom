@@ -1492,6 +1492,12 @@ on Linux and FreeBSD: each coroutine's stack is registered with valgrind,
 so memcheck follows a switch from one to another. Run natively, the
 registration costs a few instructions per stack.
 
+Any program can be run under memcheck without suppressions for the
+collector: when the program runs under valgrind, the collector tells
+memcheck that each stack word it scans is defined, so a stack slot that
+was never written is not reported for the scan's reads, while the
+program's own use of an undefined value still is.
+
 ## 12. Tasks
 
 A task is a coroutine that the module `Tasks` schedules for you: instead

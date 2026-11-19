@@ -29,7 +29,8 @@ Version:        0.14.0
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
-# rtl/llvm/valgrind.h, compiled into poc-rtl's Coroutines, is bzip2-1.0.6 (BSD-style)
+# rtl/llvm/valgrind.h and memcheck.h, compiled into poc-rtl's Coroutines and
+# GarbageCollectedHeap, are bzip2-1.0.6 (BSD-style)
 License:        BSD-3-Clause AND bzip2-1.0.6
 URL:            https://github.com/tkurtbond/peaseblossom
 Source0:        %{url}/releases/download/v%{version}/%{name}-%{version}.tar.gz

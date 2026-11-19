@@ -1766,7 +1766,9 @@ LLVM-targeted program that allocates on the heap links in. Written
 as ordinary Oberon-2 over SYSTEM.ADDRESS - no pointer variables, no
 NEW - so it can be compiled by poc itself, and depends on the C
 library only for calloc (chunk memory) and LLVM's own
-llvm.eh.unwind.init (register spilling).
+llvm.eh.unwind.init (register spilling). Its part in C,
+GarbageCollectedHeap.c, reads the stack's words for memcheck when the
+program runs under valgrind, and nothing else.
 
 HEAP SHAPE. Memory comes from calloc in *chunks*. A chunk holds, in
 order: a small header (the ChunkNext.. words below), a *start map* -

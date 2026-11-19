@@ -22,6 +22,7 @@ test/conformance/**/*.c
 !test/conformance/llvm-tasks-timed/part/Pipes.c
 !test/conformance/llvm-external-variable/part/Counters.c
 !test/conformance/llvm-coroutines-c-callback/part/Callback.c
+!test/conformance/llvm-gc-valgrind/part/Hole.c
 test/conformance/**/*.h
 # a fixture's own C header (Phase 13 step 2: -c-flag)
 !test/conformance/poc-c-flag/include/fnv.h
@@ -328,6 +329,8 @@ test/conformance/llvm-coroutines-c-callback/llvm-coroutines-c-callback
 test/conformance/llvm-coroutines-unwind/work/
 test/conformance/llvm-coroutines-valgrind/*.exe
 test/conformance/llvm-coroutines-valgrind/valgrind.log
+test/conformance/llvm-gc-valgrind/*.exe
+test/conformance/llvm-gc-valgrind/valgrind.log
 test/conformance/llvm-tasks/llvm-tasks
 test/conformance/llvm-tasks/llvm-tasks-oc
 test/conformance/llvm-tasks-channels/llvm-tasks-channels

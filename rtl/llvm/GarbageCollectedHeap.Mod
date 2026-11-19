@@ -5,7 +5,9 @@ MODULE GarbageCollectedHeap;
      as ordinary Oberon-2 over SYSTEM.ADDRESS - no pointer variables, no
      NEW - so it can be compiled by poc itself, and depends on the C
      library only for calloc (chunk memory) and LLVM's own
-     llvm.eh.unwind.init (register spilling).
+     llvm.eh.unwind.init (register spilling). Its part in C,
+     GarbageCollectedHeap.c, reads the stack's words for memcheck when the
+     program runs under valgrind, and nothing else.
 
      HEAP SHAPE. Memory comes from calloc in *chunks*. A chunk holds, in
      order: a small header (the ChunkNext.. words below), a *start map* -
@@ -170,6 +172,9 @@ MODULE GarbageCollectedHeap;
     blockAreaBytes: SYSTEM.ADDRESS; (* the sum of every chunk's block area *)
     heapLimit, chunkBytes: SYSTEM.ADDRESS;
     stackBase: SYSTEM.ADDRESS;
+    (* whether the program runs under valgrind, asked by Collect's first
+       call (valgrindChecked) *)
+    underValgrind, valgrindChecked: BOOLEAN;
     stackScanner: PROCEDURE; (* Coroutines' scan of the suspended stacks *)
     finalizersRunning: LONGINT; (* the finalizer calls under way, for Coroutines *)
     markStack, markStackCapacity, markStackCount: SYSTEM.ADDRESS;
@@ -200,6 +205,9 @@ MODULE GarbageCollectedHeap;
   PROCEDURE ["C", "atexit"] AtExit(handler: ExitHandler): SYSTEM.INT32;
 
   (* ---- word and byte access ---- *)
+
+  PROCEDURE ["C", "GarbageCollectedHeap.-under-valgrind"] UnderValgrind(): SYSTEM.INT32;
+  PROCEDURE ["C", "GarbageCollectedHeap.-defined-word"] DefinedWord(address: SYSTEM.ADDRESS): SYSTEM.ADDRESS;
 
   PROCEDURE GetWord(address: SYSTEM.ADDRESS): SYSTEM.ADDRESS;
     VAR value: SYSTEM.ADDRESS;
@@ -577,6 +585,22 @@ MODULE GarbageCollectedHeap;
     END
   END MarkFromModuleTables;
 
+  (* MarkRange's and MarkFromStack's loop under valgrind: each word read
+     through GarbageCollectedHeap.c's DefinedWord, a copy memcheck takes
+     for defined. A stack slot the program has not yet written holds
+     whatever an earlier call left, which may name a live block, and
+     memcheck would report every use the marking makes of it
+     (doc/developer/collector-under-valgrind.md). Kept apart from the
+     plain loops so that a native run pays one test per scan, not one
+     per word. *)
+  PROCEDURE MarkRangeDefined(low, high: SYSTEM.ADDRESS);
+  BEGIN
+    WHILE high - low >= word DO
+      MarkCandidate(DefinedWord(low));
+      low := low + word
+    END
+  END MarkRangeDefined;
+
   (* Scans the machine stack, from this frame's own local up to the base
      SetStackBase recorded. Called from Collect *after* the registers
      were spilled into Collect's frame, so that everything a caller kept
@@ -587,6 +611,7 @@ MODULE GarbageCollectedHeap;
     IF stackBase = 0 THEN RETURN END;
     top := SYSTEM.ADR(marker);
     top := top - top MOD word;
+    IF underValgrind THEN MarkRangeDefined(top, stackBase); RETURN END;
     count := (stackBase - top) DIV word;
     index := 0;
     WHILE index < count DO
@@ -752,6 +777,9 @@ MODULE GarbageCollectedHeap;
   BEGIN
     IF collecting THEN RETURN END;
     collecting := TRUE;
+    IF ~valgrindChecked THEN
+      underValgrind := UnderValgrind() # 0; valgrindChecked := TRUE
+    END;
     IF markStack = 0 THEN
       markStack := CAllocate(markStackCapacity, word)
     END;
@@ -838,6 +866,7 @@ MODULE GarbageCollectedHeap;
   PROCEDURE MarkRange*(low, high: SYSTEM.ADDRESS);
   BEGIN
     low := low - low MOD word;
+    IF underValgrind THEN MarkRangeDefined(low, high); RETURN END;
     WHILE high - low >= word DO
       MarkCandidate(GetWord(low));
       low := low + word
