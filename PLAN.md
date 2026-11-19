@@ -1618,12 +1618,27 @@ Those fixed while Phase 18 was current, 8-10, are in
     and `fwrite` too; not done. Not reproduced, for the reason above.
 
 27. **`MAX(SYSTEM.ADDRESS)` and `MIN(SYSTEM.ADDRESS)` are refused** ("MAX/MIN
-    requires a basic type or SET"). Found 2026-11-18, fixing bug 26.
+    requires a basic type or SET") [fixed]. Found 2026-11-18, fixing bug 26.
     `AGENTS.md` makes `ADDRESS` an integer type, and `MAX`/`MIN` take
     `SYSTEM.CARDn`, `SYSTEM.INTn` and even `SYSTEM.CARD`, as wide as
     `ADDRESS` (checked), but not `ADDRESS` itself.
     `GarbageCollectedHeap` and now `Files` compute it in their module
     bodies by doubling until the value wraps.
+    - Fixed (2026-11-18): `ConstantEvaluator.MaxMinBound` gives `ADDRESS`
+      the bounds of a signed integer of the target's word size (`2^31 - 1`
+      and `-2^31` on 32-bit LLVM targets and the VAX, `2^63 - 1` and
+      `-2^63` on 64-bit), typed `ADDRESS`, folded and exported as any other
+      `MAX`/`MIN`. The fixture `llvm-max-min-address` checks them on the
+      host against the doubled bounds, through a `.sym`, and as the 32-bit
+      and 64-bit targets write them; `vax-max-min-address` as the VAX
+      writes them (apart, since `make check-opt2` gives poc `-opt 2`,
+      which the VAX target refuses).
+    - Still to do (the user, 2026-11-18): `GarbageCollectedHeap`
+      (`rtl/llvm`, `rtl/vax`) and `rtl/llvm/Files.Mod` keep the doubling
+      for now, so that a released poc without this fix (a `BOOTSTRAP_POC`,
+      or an installed poc on the VAX guest) still compiles them; their
+      comments say so. Once a release has this fix, replace the doubling
+      with `MIN(SYSTEM.ADDRESS)` and `MAX(SYSTEM.ADDRESS)`.
 
 28. **The collector frees an object of a record with no fields while it
     is still reachable, on 64-bit targets** [fixed]. Found 2026-11-18 by

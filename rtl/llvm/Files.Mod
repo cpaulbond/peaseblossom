@@ -119,7 +119,8 @@ MODULE Files;
     MaxPathLength-, MaxNameLength-: INTEGER;
     temporaryCount: LONGINT;
     (* MAX(SYSTEM.ADDRESS), the furthest fseek reaches, set by the module
-       body: MAX of SYSTEM.ADDRESS is not taken yet *)
+       body by doubling, so that a poc released before bug 27's fix,
+       which refused MAX/MIN of SYSTEM.ADDRESS, still compiles this module *)
     maxOffset: SYSTEM.ADDRESS;
     searchPath: POINTER TO ARRAY OF CHAR; (* NIL: the current directory *)
     home: FileName;

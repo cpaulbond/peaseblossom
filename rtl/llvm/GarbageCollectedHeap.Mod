@@ -993,8 +993,9 @@ MODULE GarbageCollectedHeap;
 
 BEGIN
   word := SIZE(SYSTEM.ADDRESS);
-  (* MIN(SYSTEM.ADDRESS), which the backend cannot lower yet: the top bit
-     alone, reached by doubling (the last doubling wraps) *)
+  (* MIN(SYSTEM.ADDRESS): the top bit alone, reached by doubling (the last
+     doubling wraps), so that a poc released before bug 27's fix, which
+     refused MAX/MIN of SYSTEM.ADDRESS, still compiles this module *)
   orderBias := 1;
   WHILE orderBias > 0 DO orderBias := orderBias * 2 END;
   heapLimit := defaultHeapLimit;

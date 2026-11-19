@@ -537,6 +537,14 @@ MODULE ConstantEvaluator;
     ELSIF t = Types.Int64 THEN
       v.type := t; v.kind := Types.intValue;
       IF wantMax THEN v.intVal := maxHugeInt ELSE v.intVal := minHugeInt END
+    ELSIF t = Types.Address THEN
+      (* as wide as a pointer on the target (SetWordSize; bug 27) *)
+      v.type := t; v.kind := Types.intValue;
+      IF wordSize = MemoryLayout.wordSize64 THEN
+        IF wantMax THEN v.intVal := maxHugeInt ELSE v.intVal := minHugeInt END
+      ELSIF wantMax THEN v.intVal := 2147483647
+      ELSE v.intVal := -2147483647 - 1
+      END
     ELSIF Types.IsCardinal(t) THEN
       (* 0 and 2^n - 1; CARD64's (and a 64-bit CARD's) as its pattern, -1 *)
       v.type := t; v.kind := Types.intValue; v.intVal := 0;

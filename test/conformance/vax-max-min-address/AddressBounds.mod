@@ -1,0 +1,6 @@
+MODULE AddressBounds;
+  IMPORT SYSTEM;
+  VAR a: SYSTEM.ADDRESS;
+BEGIN
+  a := MAX(SYSTEM.ADDRESS); a := MIN(SYSTEM.ADDRESS)
+END AddressBounds.
