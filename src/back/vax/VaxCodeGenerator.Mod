@@ -1916,16 +1916,31 @@ MODULE VaxCodeGenerator;
     RETURN t
   END StaticType;
 
+  PROCEDURE ^ StructuredOperand(v: Types.Value): Operand;
+
+  (* Whether obj is a constant of a record or an array type, which has
+     storage in POC_CONST (StructuredOperand) *)
+  PROCEDURE IsStructuredConstObject(obj: SymbolTable.Object): BOOLEAN;
+  BEGIN
+    RETURN (obj # NIL) & (obj.class = SymbolTable.constClass) & (obj.value # NIL)
+           & (obj.value.kind = Types.structuredValue)
+  END IsStructuredConstObject;
+
   (* The variable d designates, obj, with its selectors applied: a field is
      its offset from the record (Displace), an element Index's, or
      IndexOpen's for an open array; a pointer is dereferenced, by ^ or
      before a field or an element (Dereference); a type guard checks the
-     dynamic type and narrows the static one (Guard). *)
+     dynamic type and narrows the static one (Guard). obj may be a
+     structured constant, its selectors applied to its storage in
+     POC_CONST as to a variable's: a constant index the checker has folded
+     already, so a variable one (bug 31). *)
   PROCEDURE Locate(d: SyntaxTree.Designator; obj: SymbolTable.Object; line, column: INTEGER): Operand;
     VAR x: Operand; sel: SyntaxTree.Selector; e: SyntaxTree.ExprNode; rec: Types.RecordType; f: Types.Field;
         text: ARRAY 160 OF CHAR; whole: BOOLEAN;
   BEGIN
-    x := Variable(obj, line, column);
+    IF IsStructuredConstObject(obj) THEN x := StructuredOperand(obj.value)
+    ELSE x := Variable(obj, line, column)
+    END;
     sel := d.selectors; whole := TRUE; (* still obj itself, but for guards *)
     WHILE sel # NIL DO
       IF (x.type IS Types.PointerType) & ~(sel IS SyntaxTree.GuardSelector) THEN
@@ -2990,6 +3005,9 @@ MODULE VaxCodeGenerator;
          checker allows nowhere else (PLAN.md, "Ongoing language
          enhancements", item 3) *)
       RETURN ProcedureValue(obj, dest, e.line, e.column)
+    ELSIF IsStructuredConstObject(obj) & (d.selectors # NIL) THEN
+      (* an element or a field of one, its selector not constant *)
+      RETURN Locate(d, obj, e.line, e.column)
     ELSIF (obj = NIL) OR (obj.class # SymbolTable.varClass) THEN
       Unsupported(e.line, e.column, "this designator as a value"); RETURN Dummy()
     END;
