@@ -835,6 +835,14 @@ $ ./Fields
 pears  12 9.000000E+00
 ```
 
+Each `OutStr` procedure finds the end of its string by searching from the
+start. For a long run of appends, its twin with `At` added (`CharAt`,
+`StringAt`, `IntAt`, `RealAt`, ...) takes one more parameter, `VAR pos`,
+the index of the string's 0X, and moves it on past what it appends:
+start with `line := ""; pos := 0` and call `OutStr.IntAt(count, 4, line,
+pos)`. If `line` is changed some other way, set `pos` again; a `pos` that
+is not at a 0X is searched forward from, or from the start.
+
 **Mathematics** (`Math`):
 
 <!-- example: runtime/Roots.Mod -->

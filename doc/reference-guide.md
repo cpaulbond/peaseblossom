@@ -2805,6 +2805,17 @@ Text that does not fit is cut short, silently, and s always ends in a
 0X: a call never writes beyond s. If s has no 0X, its last character
 is replaced by one before anything is appended.
 
+Each has a twin, its name with At added (CharAt, StringAt, LnAt,
+IntAt, HexAt, CardAt, CardHexAt, RealAt, LongRealAt), whose last
+parameter, VAR pos, says where s's text ends, so that a run of calls
+does not search s for its end each time: start with s := "" and
+pos := 0. If s[pos] is 0X, the text goes there; if not, at the next
+0X after pos; and if pos is outside s or no 0X follows it, at s's
+first 0X, as the others put it. On return pos is where s's 0X now
+is, the text cut short or not. A 0X at pos is taken for the end
+without a look before it, so a program that shortens s itself sets
+pos too (s := ""; pos := 0).
+
 poc's own: voc has no OutStr, and String's read-only parameter, str-,
 takes a string constant, which voc's would not.
 ```
@@ -2812,42 +2823,51 @@ takes a string constant, which voc's would not.
 ```oberon
 MODULE OutStr;
   (* ch *)
+  PROCEDURE CharAt*(ch: CHAR; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE Char*(ch: CHAR; VAR s: ARRAY OF CHAR);
 
   (* The characters of str up to its 0X (all of it if it has none), without
      the 0X. str may be s itself: its length is taken first. *)
+  PROCEDURE StringAt*(str-: ARRAY OF CHAR; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE String*(str-: ARRAY OF CHAR; VAR s: ARRAY OF CHAR);
 
   (* A line feed, 0AX *)
+  PROCEDURE LnAt*(VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE Ln*(VAR s: ARRAY OF CHAR);
 
   (* x in decimal, right-aligned in a field n characters wide: padded with
      blanks on the left if it takes fewer, whole if it takes more. No plus
      sign. *)
+  PROCEDURE IntAt*(x: HUGEINT; n: HUGEINT; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE Int*(x: HUGEINT; n: HUGEINT; VAR s: ARRAY OF CHAR);
 
   (* x as hexadecimal digits, upper case, at least n of them (n is taken to
      be within 1..16): as many as x needs if that is more - but a negative
      x gets exactly n, the low ones of its two's complement, as in voc. *)
+  PROCEDURE HexAt*(x: HUGEINT; n: HUGEINT; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE Hex*(x: HUGEINT; n: HUGEINT; VAR s: ARRAY OF CHAR);
 
   (* x, of any CARD type, in decimal, right-aligned in a field n characters
      wide, as Int (AGENTS.md, "Unsigned integer types") *)
+  PROCEDURE CardAt*(x: SYSTEM.CARD64; n: HUGEINT; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE Card*(x: SYSTEM.CARD64; n: HUGEINT; VAR s: ARRAY OF CHAR);
 
   (* x, of any CARD type, as hexadecimal digits, upper case, at least n of
      them (n is taken to be within 1..16), and as many as x needs if that
      is more *)
+  PROCEDURE CardHexAt*(x: SYSTEM.CARD64; n: HUGEINT; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE CardHex*(x: SYSTEM.CARD64; n: HUGEINT; VAR s: ARRAY OF CHAR);
 
   (* x in exponential form (d.dddE+dd), right-aligned in a field of n
      characters: as many digits as fit, from 2 to 9, at least 6 generated
      to drop trailing zeros from. A plus sign of the mantissa is not
      written. *)
+  PROCEDURE RealAt*(x: REAL; n: INTEGER; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE Real*(x: REAL; n: INTEGER; VAR s: ARRAY OF CHAR);
 
   (* The same for a LONGREAL, with D and a three-digit exponent, and up to
      17 digits. *)
+  PROCEDURE LongRealAt*(x: LONGREAL; n: INTEGER; VAR s: ARRAY OF CHAR; VAR pos: LONGINT);
   PROCEDURE LongReal*(x: LONGREAL; n: INTEGER; VAR s: ARRAY OF CHAR);
 END OutStr.
 ```

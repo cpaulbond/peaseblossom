@@ -79,7 +79,9 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
 - `OutStr.Mod`, `InStr.Mod` - `Out`'s output procedures appending to a
   string, and `In`'s reading from a string at a position it moves on
   (`PLAN.md`, "Ongoing library enhancements"). poc's own: voc has neither.
-  `OutStr` makes its text with `FormattedText`, as `Out` does; `InStr`
+  Each `OutStr` procedure has a twin with `At` (`IntAt`) that appends at a
+  position it moves on, `VAR pos`, instead of searching for the string's
+  end. `OutStr` makes its text with `FormattedText`, as `Out` does; `InStr`
   reads with `FormattedInput`, as `In` does, its string a read-only
   parameter, never copied.
 - `Err.Mod` - `Out`'s interface (`Open`, `Flush`, `Char`, `String`,

@@ -1723,7 +1723,16 @@ Those done while Phase 15 was current, 1 and 2, are in
     character that ends the string. If it does, it inserts there.  If
     it doesn't, it moves forward to where that string ends and then
     inserts.  When the procedures return, `pos` points to the position
-    of the new end-of-string null character.
+    of the new end-of-string null character. [done]
+    - Done (2026-11-18): each `OutStr` procedure has a twin, its name
+      with `At` added (`CharAt`, `StringAt`, `LnAt`, `IntAt`, `HexAt`,
+      `CardAt`, `CardHexAt`, `RealAt`, `LongRealAt`), whose last
+      parameter is `VAR pos: LONGINT`, as above. A `pos` outside the
+      string, or with no 0X after it, starts the search from the
+      string's beginning, as the others do (the user, 2026-11-18); a 0X
+      at `pos` is taken for the end without a look before it. The
+      others now call their twins. Fixtures `llvm-outstr` and
+      `vax-outstr` (in `rtl/vax` too, a copy kept the same).
 
 4.  An Oakwood `Coroutines` module on both back ends [done] (the user,
     2026-11-13; Phase 19's candidate 7, option B of

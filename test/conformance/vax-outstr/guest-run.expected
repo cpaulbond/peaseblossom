@@ -90,4 +90,15 @@ echo echo
 8: ab-1234 7
 wxy
 pad                 |
+At the same
+[x=  -42002A  700FF;5.0000E-012.50000D-001] pos 41
+[abcd] pos  4
+[abcde] pos  5
+[abc12] pos  5
+[abc] pos  3
+[ab] pos  2
+trusted: 7 !
+[abcde] pos  5
+[abcde] pos  5
+[echo echo ] pos 10
 run status: %X00000001

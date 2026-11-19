@@ -2,7 +2,9 @@ MODULE outstr;
   (* OutStr (Phase 15's "Ongoing library enhancements" 1): each case is
      written by Out, then by OutStr into a string that Out writes; the two
      lines must be the same (test.sh checks). Then appending to a string
-     that holds text, and truncation at every length of a short one. *)
+     that holds text, and truncation at every length of a short one. Last,
+     the twins with At: each kind of text appended at pos, as the others
+     append it, and pos where it starts and after. *)
   IMPORT SYSTEM, Out, OutStr;
   VAR
     s: ARRAY 128 OF CHAR;
@@ -10,6 +12,17 @@ MODULE outstr;
     s1: ARRAY 1 OF CHAR; s2: ARRAY 2 OF CHAR; s3: ARRAY 3 OF CHAR; s4: ARRAY 4 OF CHAR;
     s5: ARRAY 5 OF CHAR; s6: ARRAY 6 OF CHAR; s7: ARRAY 7 OF CHAR; s8: ARRAY 8 OF CHAR;
     full: ARRAY 4 OF CHAR;
+    t, u: ARRAY 64 OF CHAR; pos: LONGINT;
+
+  (* t's text, then pos and whether it is where t's first 0X is *)
+  PROCEDURE ShowPos(VAR t: ARRAY OF CHAR; pos: LONGINT);
+    VAR k: LONGINT;
+  BEGIN
+    k := 0; WHILE (k < LEN(t)) & (t[k] # 0X) DO INC(k) END;
+    Out.String("["); Out.String(t); Out.String("] pos"); Out.Int(pos, 3);
+    IF pos # k THEN Out.String(", but the 0X is at"); Out.Int(k, 3) END;
+    Out.Ln
+  END ShowPos;
 
   PROCEDURE Show; BEGIN Out.Char("|"); Out.Ln; Out.String(s); Out.Char("|"); Out.Ln; s := "" END Show;
 
@@ -60,5 +73,32 @@ BEGIN
   (* a string with no 0X: its last character gives way to one *)
   full[0] := "w"; full[1] := "x"; full[2] := "y"; full[3] := "z";
   OutStr.Char("!", full); Out.String(full); Out.Ln;
-  s := "pad"; OutStr.Int(1, 200, s); s[20] := 0X; Out.String(s); Out.Char("|"); Out.Ln
+  s := "pad"; OutStr.Int(1, 200, s); s[20] := 0X; Out.String(s); Out.Char("|"); Out.Ln;
+
+  (* every At twin, from pos 0, against the others *)
+  t := ""; OutStr.String("x=", t); OutStr.Int(-42, 5, t); OutStr.Hex(42, 4, t);
+  OutStr.Card(7, 3, t); OutStr.CardHex(255, 4, t); OutStr.Char(";", t);
+  OutStr.Real(0.5, 10, t); OutStr.LongReal(0.25D0, 12, t); OutStr.Ln(t);
+  u := ""; pos := 0; OutStr.StringAt("x=", u, pos); OutStr.IntAt(-42, 5, u, pos);
+  OutStr.HexAt(42, 4, u, pos); OutStr.CardAt(7, 3, u, pos); OutStr.CardHexAt(255, 4, u, pos);
+  OutStr.CharAt(";", u, pos); OutStr.RealAt(0.5, 10, u, pos); OutStr.LongRealAt(0.25D0, 12, u, pos);
+  OutStr.LnAt(u, pos);
+  IF u = t THEN Out.String("At the same") ELSE Out.String("At differs") END; Out.Ln;
+  u[pos - 1] := 0X; DEC(pos); ShowPos(u, pos);
+  (* pos before the 0X: the next 0X after it *)
+  u := "abc"; pos := 1; OutStr.CharAt("d", u, pos); ShowPos(u, pos);
+  (* pos outside u: from u's start *)
+  u := "abc"; pos := -5; OutStr.StringAt("de", u, pos); ShowPos(u, pos);
+  u := "abc"; pos := LEN(u); OutStr.IntAt(12, 0, u, pos); ShowPos(u, pos);
+  (* no 0X after pos: from u's start *)
+  COPY("abc", s4); pos := 3; s4[3] := "z"; OutStr.CharAt("!", s4, pos); ShowPos(s4, pos);
+  COPY("a", s4); s4[2] := "q"; s4[3] := "q"; pos := 2; OutStr.CharAt("b", s4, pos); ShowPos(s4, pos);
+  (* a 0X at pos is the end, without a look before it *)
+  u := "abcdef"; u[2] := 0X; pos := 6; OutStr.CharAt("!", u, pos);
+  Out.String("trusted:"); Out.Int(pos, 2); Out.Char(" "); Out.Char(u[6]); Out.Ln;
+  (* cut short: pos stays at the last character *)
+  pos := 0; s6 := ""; OutStr.StringAt("abcdefgh", s6, pos); ShowPos(s6, pos);
+  OutStr.IntAt(1, 0, s6, pos); OutStr.LnAt(s6, pos); ShowPos(s6, pos);
+  (* a string onto itself *)
+  u := "echo "; pos := 5; OutStr.StringAt(u, u, pos); ShowPos(u, pos)
 END outstr.
