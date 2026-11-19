@@ -481,6 +481,24 @@ MODULE LLVMTypes;
     RETURN found
   END NeedsStackRealignment;
 
+  (* The option naming the CPU poc has clang compile for triple, in option,
+     and TRUE; FALSE, option empty, where clang's own default stays. Only
+     32-bit x86 Linux gets one, -march=i686: clang's default CPU there is
+     pentium4, whose SSE2 it uses for copies and conversions even at -O0,
+     and poc's code must run on a Pentium II (i686, no SSE). The BSDs'
+     defaults, i486 on NetBSD, i586 on OpenBSD and i686 on FreeBSD, are
+     each system's own floor and stay (doc/developer/32-bit-x86-cpu.md). *)
+  PROCEDURE TargetCPUOption*(triple: ARRAY OF CHAR; VAR option: ARRAY OF CHAR): BOOLEAN;
+  BEGIN
+    IF Is32BitX86(triple)
+       & (TripleComponentStartsWith(triple, 1, "linux") OR TripleComponentStartsWith(triple, 2, "linux")) THEN
+      COPY("-march=i686", option)
+    ELSE
+      option[0] := 0X
+    END;
+    RETURN option[0] # 0X
+  END TargetCPUOption;
+
 BEGIN
   NEW(structs, 64); structCount := 0
 END LLVMTypes.

@@ -176,7 +176,8 @@ check-stage1:
 # are the fixtures whose exact real results x87 arithmetic changes when
 # optimized (the reason for the -O0 default): llvm-out-extra and llvm-math-extra on a
 # 32-bit x86 host, and llvm-i686-runtime, which reruns them for 32-bit x86,
-# on a 32-bit x86 host or a BSD (Linux i686 has SSE2). Each suite's poc has
+# everywhere (no 32-bit x86 target has SSE2 since 2026-11-18, Linux's
+# included: doc/developer/32-bit-x86-cpu.md). Each suite's poc has
 # poc-rtl built optimized in its own ../lib/poc (Phase 12 steps 2d, 2e), as
 # make builds it for build/bin/poc: the Stage 0 poc is copied to
 # build/opt2/stage0/bin for that, so that its library path does not also
@@ -187,10 +188,9 @@ VAX_TARGET_TESTS := $(filter vax-%,$(ALL_TESTS)) doc-vax-guide poc-import-wrong-
   poc-vax-target-llvm-options semantic-vms-arguments
 OPT2_DIR := $(abspath $(BUILD_DIR)/opt2)
 OPT2_HOST_X87 := $(filter i386 i486 i586 i686,$(shell uname -m))
-OPT2_HOST_BSD := $(filter-out Linux,$(shell uname -s))
 OPT2_SKIP := poc-exit-status poc-output-streams poc-opt-level poc-usage poc-options-after-file \
   $(if $(OPT2_HOST_X87),llvm-out-extra llvm-math-extra) \
-  $(if $(OPT2_HOST_X87)$(OPT2_HOST_BSD),llvm-i686-runtime) $(VAX_TARGET_TESTS)
+  llvm-i686-runtime $(VAX_TARGET_TESTS)
 OPT2_TESTS := $(filter-out $(OPT2_SKIP),$(ALL_TESTS))
 check-opt2: build
 	@rm -rf $(OPT2_DIR); mkdir -p $(OPT2_DIR)/stage0/bin $(OPT2_DIR)/wrap0 $(OPT2_DIR)/wrap1; \

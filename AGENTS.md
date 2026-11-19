@@ -166,6 +166,9 @@ on the BSDs their plain `clang` (19 on OpenBSD and FreeBSD, 21 on NetBSD).
   DataLayout`) and `target triple`; without them clang silently uses the
   host's. 32-bit x86 BSDs also get `override-stack-alignment` = 16 and
   `"stackrealign"` on `@main` (`LLVMTypes.NeedsStackRealignment`).
+- 32-bit x86 Linux gets `-march=i686` on every clang command, since
+  clang's default there (pentium4) uses SSE2; the BSDs keep their own
+  defaults, none above i686 (`doc/developer/32-bit-x86-cpu.md`).
 - Libraries (`src/driver/Libraries.Mod`): `poc -library`; the path is
   `-library-path`, `POC_LIBRARY_PATH`, `<poc's dir>/../lib/poc`. `make`
   builds `rtl/llvm` as `poc-rtl`; the bootstrap stages compile it from

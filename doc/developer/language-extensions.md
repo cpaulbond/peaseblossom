@@ -537,14 +537,15 @@ and poc, both models):
   of a `LONGREAL` too large for a `REAL` an infinity; no trap. (The VAX backend
   cannot promise this - VAX floats have no infinity or NaN; Phase 15 decides.)
   **On 32-bit x86, only at `-opt 0`** (its default there; Phase 11 D13,
-  2026-09-26): LLVM computes reals on the x87 there (clang's default CPU for
-  the i386 BSDs has no SSE2, and poc must run on a Pentium II), whose
+  2026-09-26): LLVM computes reals on the x87 there (no CPU poc builds
+  32-bit x86 code for has SSE2, since poc must run on a Pentium II), whose
   registers hold 80 bits. At `-O0` every result is stored, and so rounded to
   its type; an optimized build keeps intermediate results in the registers,
   wider in precision and exponent, so a result can differ in its last bits and
   an underflow or overflow can be missed (on OpenBSD i386 `1.0D40` printed a
   different last digit and `MathL.exp(-800)` reported no underflow). Linux
-  i686, whose default CPU has SSE2, is not affected.
+  i686 too since 2026-11-18, when poc stopped leaving it at clang's default
+  CPU, which computes reals with SSE2 (`32-bit-x86-cpu.md`).
 - **`ENTIER` is the one exception, on purpose: a value that does not fit a
   `LONGINT` (or a NaN or infinity) traps** - "ENTIER argument out of range for
   LONGINT", exit status 8 (see "Constant expressions" above). It is not
