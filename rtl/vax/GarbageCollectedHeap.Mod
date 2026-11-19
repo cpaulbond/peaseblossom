@@ -1153,8 +1153,8 @@ MODULE GarbageCollectedHeap;
 
 BEGIN
   word := SIZE(SYSTEM.ADDRESS);
-  (* MIN(SYSTEM.ADDRESS), which the backend cannot lower yet: the top bit
-     alone, reached by doubling (the last doubling wraps) *)
+  (* MIN(SYSTEM.ADDRESS), the top bit, by doubling (the last wraps), which
+     a poc released before bug 27's fix, refusing MIN, also compiles *)
   orderBias := 1;
   WHILE orderBias > 0 DO orderBias := orderBias * 2 END;
   heapLimit := PageFileLeft() DIV 4 * 3;

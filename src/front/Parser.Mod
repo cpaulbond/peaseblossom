@@ -99,12 +99,13 @@ MODULE Parser;
   END ExpectToken;
 
   (* a block whose END names another: "message: END Q, not END P"; nothing
-     when the END has no name, which ExpectIdent has reported *)
+     when the END or the block has no name, which ExpectIdent has reported
+     (bug 30) *)
   PROCEDURE ReportEndName(line, column: INTEGER; message: ARRAY OF CHAR;
                           endName, name: Names.Name);
     VAR what: ARRAY 520 OF CHAR; (* two identifiers and the words *)
   BEGIN
-    IF endName = NIL THEN RETURN END;
+    IF (endName = NIL) OR (name = NIL) THEN RETURN END;
     what := "END "; Diagnostics.AppendText(what, endName^);
     Diagnostics.AppendText(what, ", not END "); Diagnostics.AppendText(what, name^);
     Diagnostics.ErrorAbout(line, column, message, what)

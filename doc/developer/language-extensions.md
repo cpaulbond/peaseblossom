@@ -85,7 +85,10 @@ table). An `ADDRESS` and any integer type of its width include each other
 (2026-10-08, Phase 15's "Ongoing language enhancements" 2): before, under
 `-OC` on a 64-bit target, an `ADDRESS` ranked with `HUGEINT` and was not
 assignable to the 8-byte `LONGINT`, so under `-OC` an `ADDRESS` is now
-assignable to a `LONGINT` on every target. `GET`/`PUT` access memory with no alignment assumption;
+assignable to a `LONGINT` on every target. `MAX(SYSTEM.ADDRESS)` and
+`MIN(SYSTEM.ADDRESS)` are the bounds of a signed integer of its width,
+constants of type `ADDRESS` (refused until 2026-11-18, bug 27;
+`llvm-max-min-address`, `vax-max-min-address`). `GET`/`PUT` access memory with no alignment assumption;
 `PUT(a, x)` stores `x` at `x`'s own type, so a bare numeral is stored at
 its minimal integer type's width (`PUT(a, 5)` writes a `SHORTINT`-sized
 value under `-O2`). `VAL(T, x)` between scalars of different widths

@@ -21,7 +21,7 @@ SHARED_LIBS =		poc-rtl			0.0
 HOMEPAGE =		https://github.com/tkurtbond/peaseblossom
 MAINTAINER =		T. Kurt Bond <tkurtbond@gmail.com>
 
-# BSD-3-Clause; rtl/llvm/valgrind.h bzip2-1.0.6 (BSD-style)
+# BSD-3-Clause; rtl/llvm/valgrind.h and memcheck.h bzip2-1.0.6 (BSD-style)
 PERMIT_PACKAGE =	Yes
 
 SITES =			https://github.com/tkurtbond/peaseblossom/releases/download/v${V}/

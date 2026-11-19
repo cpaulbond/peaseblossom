@@ -1618,12 +1618,27 @@ Those fixed while Phase 18 was current, 8-10, are in
     and `fwrite` too; not done. Not reproduced, for the reason above.
 
 27. **`MAX(SYSTEM.ADDRESS)` and `MIN(SYSTEM.ADDRESS)` are refused** ("MAX/MIN
-    requires a basic type or SET"). Found 2026-11-18, fixing bug 26.
+    requires a basic type or SET") [fixed]. Found 2026-11-18, fixing bug 26.
     `AGENTS.md` makes `ADDRESS` an integer type, and `MAX`/`MIN` take
     `SYSTEM.CARDn`, `SYSTEM.INTn` and even `SYSTEM.CARD`, as wide as
     `ADDRESS` (checked), but not `ADDRESS` itself.
     `GarbageCollectedHeap` and now `Files` compute it in their module
     bodies by doubling until the value wraps.
+    - Fixed (2026-11-18): `ConstantEvaluator.MaxMinBound` gives `ADDRESS`
+      the bounds of a signed integer of the target's word size (`2^31 - 1`
+      and `-2^31` on 32-bit LLVM targets and the VAX, `2^63 - 1` and
+      `-2^63` on 64-bit), typed `ADDRESS`, folded and exported as any other
+      `MAX`/`MIN`. The fixture `llvm-max-min-address` checks them on the
+      host against the doubled bounds, through a `.sym`, and as the 32-bit
+      and 64-bit targets write them; `vax-max-min-address` as the VAX
+      writes them (apart, since `make check-opt2` gives poc `-opt 2`,
+      which the VAX target refuses).
+    - Still to do (the user, 2026-11-18): `GarbageCollectedHeap`
+      (`rtl/llvm`, `rtl/vax`) and `rtl/llvm/Files.Mod` keep the doubling
+      for now, so that a released poc without this fix (a `BOOTSTRAP_POC`,
+      or an installed poc on the VAX guest) still compiles them; their
+      comments say so. Once a release has this fix, replace the doubling
+      with `MIN(SYSTEM.ADDRESS)` and `MAX(SYSTEM.ADDRESS)`.
 
 28. **The collector frees an object of a record with no fields while it
     is still reachable, on 64-bit targets** [fixed]. Found 2026-11-18 by
@@ -1688,6 +1703,69 @@ Those fixed while Phase 18 was current, 8-10, are in
       interface keys (`-key.`), which hash `.sym` files whose layout
       differs between versions of poc while the code is the same.
 
+30. **Three stray tokens before `MODULE` crash poc with a NIL pointer
+    dereference** [fixed]. Found 2026-11-19, with 0.14.0 (a410135) on
+    x86_64, researching UTF-8 support: a source file that starts with a
+    UTF-8 byte order mark (`EF BB BF`) crashes poc. The bytes need not
+    be invalid: any three tokens, or invalid characters, before `MODULE`
+    do it (`###`, `)))`, `# # #`, the three BOM bytes, and the same
+    followed by a newline). One or two (`##`, `EF`, `EF BB`) give
+    ordinary errors and exit status 1. The smallest program:
+
+    ```
+    ###MODULE B; END B.
+    ```
+
+    `poc -check` (or `-compile`) prints the parse errors, then dies,
+    with exit status 4:
+
+    ```
+    C.Mod:1:1: error: expected 'MODULE'
+    C.Mod:1:2: error: expected an identifier
+    C.Mod:1:3: error: expected ';'
+    C.Mod:1:4: error: expected 'END'
+    C.Mod:1:12: error: expected '.'
+    NIL pointer dereference
+    ```
+
+    Whether poc should skip a leading BOM is a separate question, taken
+    up in the UTF-8 research
+    (`~/Repos/Oberon/pounicode/docs/developer/adding-utf8-reading-to-poc.md`).
+    - Cause: the stray tokens are not the point. The parser takes the
+      three as `MODULE`, the module's name and `;`; the name, not an
+      identifier, is NIL after `ExpectIdent` reports it, and the `END
+      B` that follows does name one. `Parser.ReportEndName`, comparing
+      the two, gave up only when the END's name was NIL and dereferenced
+      the block's. `MODULE 1; END B.` and `MODULE B; PROCEDURE 1; END
+      P; END B.` crash the same way, with no stray tokens. One or two
+      stray tokens shift the parse so that the END has no name.
+    - Fixed (2026-11-19): `ReportEndName` reports nothing when either
+      name is missing; `ExpectIdent` has reported the error. Fixture
+      `parser-reject-unnamed-end` has the module, the procedure, `###`
+      and the byte order mark.
+
+31. **The VAX back end refuses a structured constant indexed with a
+    variable** [fixed]. Found 2026-11-19, with 0.14.0 (a410135), by
+    another session: `squares[i]`, with `CONST squares = Squares{0, 1,
+    4, 9}` and `i` a variable, gives "the VAX backend cannot lower this
+    yet: this designator as a value"; so do `points[i].x`,
+    `named.values[i]` and `grid[i]` passed to an open array. A
+    constant index works, since the front end folds it, and the LLVM
+    back end takes them all: it addresses the constant's private global
+    as a variable (`LLVMCodeGenerator`, "Structured constants"). The VAX
+    back end has the storage too, `L_CONST_<n>` in `POC_CONST`
+    (`StructuredOperand`, 2026-10-11), but used it only to copy the
+    whole constant or pass its address: `Designator` took only a
+    variable's name, and `Locate`, which applies the selectors, started
+    from `Variable(obj)`.
+    - Fixed (2026-11-19): `Locate` starts from `StructuredOperand` for a
+      record or array constant, and `Designator` passes such a constant
+      with selectors to it, so its elements and fields are selected as a
+      variable's are, index checks included. Fixture
+      `vax-structured-constant-index` (its `expected-vax.mar` not yet
+      reviewed by the user), its program in `test/vax-suite.list` under
+      `-O2` and `-OC`; `vax-macro32-backend.md` says so.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
@@ -1708,7 +1786,16 @@ Those done while Phase 15 was current, 1 and 2, are in
     character that ends the string. If it does, it inserts there.  If
     it doesn't, it moves forward to where that string ends and then
     inserts.  When the procedures return, `pos` points to the position
-    of the new end-of-string null character.
+    of the new end-of-string null character. [done]
+    - Done (2026-11-18): each `OutStr` procedure has a twin, its name
+      with `At` added (`CharAt`, `StringAt`, `LnAt`, `IntAt`, `HexAt`,
+      `CardAt`, `CardHexAt`, `RealAt`, `LongRealAt`), whose last
+      parameter is `VAR pos: LONGINT`, as above. A `pos` outside the
+      string, or with no 0X after it, starts the search from the
+      string's beginning, as the others do (the user, 2026-11-18); a 0X
+      at `pos` is taken for the end without a look before it. The
+      others now call their twins. Fixtures `llvm-outstr` and
+      `vax-outstr` (in `rtl/vax` too, a copy kept the same).
 
 4.  An Oakwood `Coroutines` module on both back ends [done] (the user,
     2026-11-13; Phase 19's candidate 7, option B of
@@ -2265,7 +2352,7 @@ Those done while Phase 18 was current, 5-7, are in
       from both.
 
 13. Investigate: the collector turning off valgrind's error reporting
-    while it collects (the user, 2026-11-18; found in posockets and
+    while it collects [done] (the user, 2026-11-18; found in posockets and
     polibtls, putting their task tests under full memcheck now that
     bug 21 is fixed). The collector scans stacks conservatively, a
     coroutine's included, so memcheck reports the words it reads that
@@ -2278,11 +2365,13 @@ Those done while Phase 18 was current, 5-7, are in
     (`--track-origins`: stack allocations in `SocketTasks.Await` and
     `TestFileServer.Whole`), and it now needs a suppression file of its
     own (`test/TestFileServer.supp`).
-    - The same `DrainMarkStack` report is a real bug elsewhere: a record
-      copied whole from the stack into the heap carries its
+    - The same `DrainMarkStack` report was thought a real bug elsewhere:
+      a record copied whole from the stack into the heap carrying its
       uninitialised padding (pogeminilib, Phase 2). So the projects
-      keep it out of their shared `poc-gc.supp`, and a blanket
-      suppression would hide that bug.
+      keep it out of their shared `poc-gc.supp`. That diagnosis was
+      wrong: SROA had taken the record apart, and the words were
+      `Take`'s spill slots, read by the stack scan
+      (`doc/developer/collector-under-valgrind.md`).
     - The idea: wrap a collection in `VALGRIND_DISABLE_ERROR_REPORTING`
       / `VALGRIND_ENABLE_ERROR_REPORTING` (`rtl/llvm/valgrind.h`, as
       `Coroutines.c` already uses for bug 21). Or mark each word as
@@ -2296,6 +2385,25 @@ Those done while Phase 18 was current, 5-7, are in
         instructions when not under valgrind);
       - whether the projects' `poc-gc.supp` files and
         `TestFileServer.supp` can then go.
+    - Done (2026-11-18): under valgrind the stack scan (`MarkFromStack`,
+      and `MarkRange` for coroutines) reads each word through
+      `GarbageCollectedHeap.c`'s `DefinedWord`, which copies it and
+      marks the copy defined (`VALGRIND_MAKE_MEM_DEFINED`), so memcheck
+      reports nothing the scan reads and still reports every other use
+      of an undefined value; turning reporting off would hide errors
+      during a collection too. `UnderValgrind` is asked once; natively
+      GcBench runs 0.1% more instructions. `rtl/llvm/memcheck.h` is
+      valgrind 3.27.1's. Fixture `llvm-gc-valgrind`; pogeminilib's
+      `TestText` (whole-record copy restored) went from 700,877 errors
+      to 0, posockets' `TestFileServer` from 977 to 0, with no
+      suppressions. `doc/developer/collector-under-valgrind.md` has
+      the account.
+    - After a release with it: the projects drop their collector
+      suppressions (`test/poc-gc.supp` in pofltk, pogeminilib,
+      polibfyaml, polibtls, posockets and pounix, poDB's entries in
+      `test/valgrind.supp`, posockets' `test/TestFileServer.supp`),
+      and pogeminilib copies the record whole again and corrects its
+      note about padding.
 
 ## Open design questions
 

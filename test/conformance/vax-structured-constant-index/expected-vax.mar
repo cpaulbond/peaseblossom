@@ -1,0 +1,397 @@
+;; Written by Claude, 2026-11-19, for bug 31 (PLAN.md, "Ongoing bug
+;; fixing"); not yet reviewed by the user. Why this is right:
+;; - A structured constant indexed with a variable is selected from its
+;;   storage in POC_CONST, L_CONST_<n> (section 16, proposal 7), as a
+;;   variable of its type in POC_DATA would be (Locate): an element in
+;;   index mode, L_CONST_1[R0] (SumSquares), L_CONST_5[R0] (Digit); a
+;;   row of a two-dimensional table by its size, MULL2 #8 and MOVAB,
+;;   then its element (R0)[R1] (GridAt, both ways of writing it); an
+;;   element of a field at the field's offset, L_CONST_4+4[R0]
+;;   (NamedValue); a field of an element (PointX); an element copied
+;;   whole, MOVC3 (PointAt); a row's address and length passed to an
+;;   open array (RowSum).
+;; - Each index is checked as a variable's is, trap 2 at its line and
+;;   column; the constants' data is as in vax-structured-constants.
+; ConstTables, written by poc (doc/developer/vax-macro32-backend.md)
+	.TITLE	CONSTTABLES
+	.IDENT	/cb38cd732f4acd3b/
+	.PSECT	POC_CODE,  PIC,SHR,NOWRT,EXE,LONG
+	.PSECT	POC_CONST, PIC,SHR,NOWRT,NOEXE,QUAD
+	.PSECT	POC_DATA,  NOPIC,NOSHR,WRT,NOEXE,QUAD
+
+; set once the module has been initialised
+	.PSECT	POC_DATA
+L_INITIALISED:
+	.BLKB	1
+
+; for traps: poc's runtime routine (Phase 16), and the module's name
+	.EXTERNAL	POC_TRAP
+	.PSECT	POC_CONST
+L_MODULE_NAME:
+	.ASCIC	/ConstTables/
+
+; its structured constants
+	.PSECT	POC_CONST
+	.ALIGN	QUAD
+L_CONST_1:
+	.WORD	0
+	.WORD	1
+	.WORD	4
+	.WORD	9
+	.WORD	16
+	.WORD	25
+	.ALIGN	QUAD
+L_CONST_2:
+	.WORD	1
+	.WORD	2
+	.WORD	3
+	.WORD	4
+	.WORD	10
+	.WORD	20
+	.WORD	30
+	.WORD	40
+	.WORD	-1
+	.WORD	-2
+	.WORD	-3
+	.WORD	-4
+	.ALIGN	QUAD
+L_CONST_3:
+	.LONG	1
+	.LONG	-1
+	.LONG	100000
+	.LONG	-100000
+	.LONG	7
+	.LONG	8
+	.ALIGN	QUAD
+L_CONST_4:
+	.WORD	3
+	.BYTE	0[2]
+	.LONG	5
+	.LONG	50
+	.LONG	500
+	.LONG	5000
+	.ALIGN	QUAD
+L_CONST_5:
+	.BYTE	48
+	.BYTE	49
+	.BYTE	50
+	.BYTE	51
+	.BYTE	52
+	.BYTE	53
+	.BYTE	54
+	.BYTE	55
+	.BYTE	56
+	.BYTE	57
+	.BYTE	65
+	.BYTE	66
+	.BYTE	67
+	.BYTE	68
+	.BYTE	69
+	.BYTE	70
+
+; its type descriptors (section 14, item 4): size, extension level,
+; pointer count, base types, pointer offsets
+	.PSECT	POC_ADDR,  PIC,NOSHR,NOWRT,NOEXE,LONG
+; ConstTables.Point
+	.ALIGN	LONG
+CONSTTABLES_POINT_6SK9J609::
+	.LONG	8
+	.LONG	0
+	.LONG	0
+	.ADDRESS	CONSTTABLES_POINT_6SK9J609
+; ConstTables.Named
+	.ALIGN	LONG
+CONSTTABLES_NAMED_V9IA0U0E::
+	.LONG	20
+	.LONG	0
+	.LONG	0
+	.ADDRESS	CONSTTABLES_NAMED_V9IA0U0E
+
+; the module's procedures
+	.PSECT	POC_CODE
+; PROCEDURE SumSquares
+	.ENTRY	CONSTTABLES_SUMSQUARES_KDEGI9B4, ^M<>
+	SUBL2	#8, SP
+	CLRQ	-8(FP)
+; line 25
+	CLRL	-8(FP)
+; line 26
+	CLRW	-2(FP)
+L_1:
+	CMPW	-2(FP), #5
+	BLEQ	L_3
+	JMP	L^L_2
+L_3:
+; line 26
+	CVTWL	-2(FP), R0
+	CMPL	R0, #5
+	BLEQU	L_4
+	PUSHL	#45
+	PUSHL	#26
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_4:
+	CVTWL	L_CONST_1[R0], R1
+	ADDL2	R1, -8(FP)
+	SUBW3	-2(FP), #5, R0
+	CMPW	R0, #1
+	BGEQU	L_5
+	JMP	L^L_2
+L_5:
+	INCW	-2(FP)
+	JMP	L^L_1
+L_2:
+; line 27
+	MOVL	-8(FP), R0
+	RET
+	PUSHL	#3
+	PUSHL	#28
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+; PROCEDURE GridAt
+	.ENTRY	CONSTTABLES_GRIDAT_3M89CHAK, ^M<R2>
+; line 32
+	CVTWL	4(AP), R0
+	CMPL	R0, #2
+	BLEQU	L_6
+	PUSHL	#17
+	PUSHL	#32
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_6:
+	MULL2	#8, R0
+	MOVAB	L_CONST_2[R0], R0
+	CVTWL	8(AP), R1
+	CMPL	R1, #3
+	BLEQU	L_7
+	PUSHL	#20
+	PUSHL	#32
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_7:
+	MULW3	#100, (R0)[R1], R2
+	CVTWL	4(AP), R0
+	CMPL	R0, #2
+	BLEQU	L_8
+	PUSHL	#36
+	PUSHL	#32
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_8:
+	MULL2	#8, R0
+	MOVAB	L_CONST_2[R0], R0
+	CVTWL	8(AP), R1
+	CMPL	R1, #3
+	BLEQU	L_9
+	PUSHL	#39
+	PUSHL	#32
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_9:
+	ADDW2	(R0)[R1], R2
+	CVTWL	R2, R0
+	RET
+	PUSHL	#3
+	PUSHL	#33
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+; PROCEDURE SumOpen
+	.ENTRY	CONSTTABLES_SUMOPEN_IHT9ALG8, ^M<R2,R3,R4,R5>
+	SUBL2	#16, SP
+	CLRQ	-12(FP)
+	CLRL	-4(FP)
+	MOVL	8(AP), R0
+	MULL2	#2, R0
+	ADDL3	#3, R0, R1
+	BICL2	#3, R1
+	SUBL2	R1, SP
+	MOVL	SP, -4(FP)
+	PUSHL	R0
+	MOVL	4(AP), R1
+	MOVL	-4(FP), R3
+L_15:
+	MOVL	(SP), R0
+	CMPL	R0, #65535
+	BLEQU	L_16
+	MOVL	#65535, R0
+L_16:
+	SUBL2	R0, (SP)
+	MOVC3	R0, (R1), (R3)
+	TSTL	(SP)
+	BNEQ	L_15
+	ADDL2	#4, SP
+; line 38
+	CLRL	-12(FP)
+; line 39
+	CLRL	-8(FP)
+	MOVL	8(AP), R0
+	DECL	R0
+	MOVL	R0, -16(FP)
+L_10:
+	CMPL	-8(FP), -16(FP)
+	BLEQ	L_12
+	JMP	L^L_11
+L_12:
+; line 39
+	MOVL	-8(FP), R0
+	CMPL	R0, 8(AP)
+	BLSSU	L_13
+	PUSHL	#52
+	PUSHL	#39
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_13:
+	CVTWL	@-4(FP)[R0], R1
+	ADDL2	R1, -12(FP)
+	SUBL3	-8(FP), -16(FP), R0
+	CMPL	R0, #1
+	BGEQU	L_14
+	JMP	L^L_11
+L_14:
+	INCL	-8(FP)
+	JMP	L^L_10
+L_11:
+; line 40
+	MOVL	-12(FP), R0
+	RET
+	PUSHL	#3
+	PUSHL	#41
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+; PROCEDURE RowSum
+	.ENTRY	CONSTTABLES_ROWSUM_6NE07P96, ^M<>
+	SUBL2	#12, SP
+; line 45
+	MOVL	#2, -12(FP)
+	CVTWL	4(AP), R0
+	CMPL	R0, #2
+	BLEQU	L_17
+	PUSHL	#25
+	PUSHL	#45
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_17:
+	MULL2	#8, R0
+	MOVAB	L_CONST_2[R0], R0
+	MOVAB	(R0), -8(FP)
+	MOVL	#4, -4(FP)
+	CALLG	-12(FP), CONSTTABLES_SUMOPEN_IHT9ALG8
+	RET
+	PUSHL	#3
+	PUSHL	#46
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+; PROCEDURE PointX
+	.ENTRY	CONSTTABLES_POINTX_N7UFRKD3, ^M<>
+; line 50
+	CVTWL	4(AP), R0
+	CMPL	R0, #2
+	BLEQU	L_18
+	PUSHL	#19
+	PUSHL	#50
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_18:
+	MULL2	#8, R0
+	MOVAB	L_CONST_3[R0], R0
+	MOVL	(R0), R0
+	RET
+	PUSHL	#3
+	PUSHL	#51
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+; PROCEDURE PointAt
+	.ENTRY	CONSTTABLES_POINTAT_13HJ1S64, ^M<R2,R3,R4,R5>
+; line 55
+	MOVAB	CONSTTABLES_POINT_6SK9J609, R0
+	CMPL	12(AP), R0
+	BEQL	L_19
+	PUSHL	#5
+	PUSHL	#55
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#13
+	CALLS	#4, G^POC_TRAP
+L_19:
+	CVTWL	4(AP), R0
+	CMPL	R0, #2
+	BLEQU	L_20
+	PUSHL	#17
+	PUSHL	#55
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_20:
+	MULL2	#8, R0
+	MOVAB	L_CONST_3[R0], R0
+	MOVC3	#8, (R0), @8(AP)
+	RET
+; PROCEDURE NamedValue
+	.ENTRY	CONSTTABLES_NAMEDVALUE_BOQT5H3F, ^M<>
+; line 60
+	CVTWL	4(AP), R0
+	CMPL	R0, #3
+	BLEQU	L_21
+	PUSHL	#25
+	PUSHL	#60
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_21:
+	MOVL	L_CONST_4+4[R0], R0
+	RET
+	PUSHL	#3
+	PUSHL	#61
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+; PROCEDURE Digit
+	.ENTRY	CONSTTABLES_DIGIT_UO42H61U, ^M<>
+; line 65
+	CVTWL	4(AP), R0
+	CMPL	R0, #15
+	BLEQU	L_22
+	PUSHL	#19
+	PUSHL	#65
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#2
+	CALLS	#4, G^POC_TRAP
+L_22:
+	MOVZBL	L_CONST_5[R0], R0
+	RET
+	PUSHL	#3
+	PUSHL	#66
+	PUSHAB	L_MODULE_NAME
+	PUSHL	#12
+	CALLS	#4, G^POC_TRAP
+
+; the module's initializer: once only
+	.PSECT	POC_CODE
+	.ENTRY	CONSTTABLES_INIT, ^M<>
+	BLBS	L_INITIALISED, L_DONE
+	MOVB	#1, L_INITIALISED
+L_DONE:
+	RET
+
+; the module's key, which its importers refer to
+POC_K1_CB38CD732F4ACD3B == 0
+
+; the program's start: the module's initializer, then SS$_NORMAL
+	.ENTRY	CONSTTABLES_MAIN, ^M<>
+	CALLS	#0, CONSTTABLES_INIT
+	MOVL	#1, R0
+	RET
+
+	.END	CONSTTABLES_MAIN

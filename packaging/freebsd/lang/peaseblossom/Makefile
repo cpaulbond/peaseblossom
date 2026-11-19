@@ -13,9 +13,9 @@ WWW=		https://github.com/tkurtbond/peaseblossom
 
 LICENSE=	BSD3CLAUSE BZIP2
 LICENSE_COMB=	multi
-# rtl/llvm/valgrind.h, valgrind's, under bzip2's licence (BSD-style), whose
-# text is the header's first comment
-LICENSE_NAME_BZIP2=	BZIP2 license (BSD-style; rtl/llvm/valgrind.h)
+# rtl/llvm/valgrind.h and memcheck.h, valgrind's, under bzip2's licence
+# (BSD-style), whose text is each header's first comment
+LICENSE_NAME_BZIP2=	BZIP2 license (BSD-style; rtl/llvm/valgrind.h, memcheck.h)
 LICENSE_FILE_BSD3CLAUSE=	${WRKSRC}/LICENSE
 LICENSE_FILE_BZIP2=	${WRKSRC}/rtl/llvm/valgrind.h
 LICENSE_PERMS_BZIP2=	dist-mirror dist-sell pkg-mirror pkg-sell auto-accept

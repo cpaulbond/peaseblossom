@@ -79,7 +79,9 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
 - `OutStr.Mod`, `InStr.Mod` - `Out`'s output procedures appending to a
   string, and `In`'s reading from a string at a position it moves on
   (`PLAN.md`, "Ongoing library enhancements"). poc's own: voc has neither.
-  `OutStr` makes its text with `FormattedText`, as `Out` does; `InStr`
+  Each `OutStr` procedure has a twin with `At` (`IntAt`) that appends at a
+  position it moves on, `VAR pos`, instead of searching for the string's
+  end. `OutStr` makes its text with `FormattedText`, as `Out` does; `InStr`
   reads with `FormattedInput`, as `In` does, its string a read-only
   parameter, never copied.
 - `Err.Mod` - `Out`'s interface (`Open`, `Flush`, `Char`, `String`,
@@ -117,6 +119,10 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   finalization (`RegisterFinalizer`, `FinalizeAll`; Phase 12 step 5c):
   after the collection that finds an object unreachable, and for every
   object still registered when the program ends, traps included.
+  `GarbageCollectedHeap.c`, its part in C, reads the stacks' words as
+  defined when the program runs under valgrind, so that memcheck reports
+  no stale stack slot the scan finds
+  (`doc/developer/collector-under-valgrind.md`).
   `MarkRange`, `StackBase`, `SetStackScanner` and `RunningFinalizer` are
   exported for `Coroutines` only.
 - `Coroutines.Mod`, `Coroutines.c` - Oakwood's `Coroutines` (`Init`,
@@ -129,13 +135,15 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   `Transfer` in one traps. Each stack is registered with valgrind, so that memcheck
   can follow a switch between two of them
   (`doc/developer/coroutines-under-valgrind.md`).
-- `valgrind.h` - valgrind 3.27.1's, unchanged (its own BSD-style licence,
-  for this one file), for `Coroutines.c`'s `VALGRIND_STACK_REGISTER` and
-  `VALGRIND_STACK_DEREGISTER`: macros only, a few instructions that change
+- `valgrind.h`, `memcheck.h` - valgrind 3.27.1's, unchanged (their own
+  BSD-style licence, for these two files), for `Coroutines.c`'s
+  `VALGRIND_STACK_REGISTER` and `VALGRIND_STACK_DEREGISTER` and
+  `GarbageCollectedHeap.c`'s `RUNNING_ON_VALGRIND` and
+  `VALGRIND_MAKE_MEM_DEFINED`: macros only, a few instructions that change
   nothing when the program is not run under valgrind, and their default
-  value alone on OpenBSD and NetBSD. A later valgrind's copy can replace
-  it. `make` rebuilds `poc-rtl` when it changes, and poc recompiles
-  `Coroutines.c` through clang's dependency file.
+  value alone on OpenBSD and NetBSD. A later valgrind's copies can replace
+  them. `make` rebuilds `poc-rtl` when one changes, and poc recompiles
+  the `.c` files through clang's dependency files.
 - `Tasks.Mod` - cooperative tasks over `Coroutines`
   (`doc/developer/tasks.md`): a task is an extension of `TaskDesc` with
   an exported `Run`; a FIFO run queue, `Yield`, `Join`, Mesa conditions,

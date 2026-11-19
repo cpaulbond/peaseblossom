@@ -22,6 +22,7 @@ test/conformance/**/*.c
 !test/conformance/llvm-tasks-timed/part/Pipes.c
 !test/conformance/llvm-external-variable/part/Counters.c
 !test/conformance/llvm-coroutines-c-callback/part/Callback.c
+!test/conformance/llvm-gc-valgrind/part/Hole.c
 test/conformance/**/*.h
 # a fixture's own C header (Phase 13 step 2: -c-flag)
 !test/conformance/poc-c-flag/include/fnv.h
@@ -149,6 +150,7 @@ test/conformance/llvm-strings-extra/llvm-strings-extra
 test/conformance/llvm-math/llvm-math
 test/conformance/llvm-mathl/llvm-mathl
 test/conformance/llvm-math-extra/llvm-math-extra
+test/conformance/llvm-max-min-address/llvm-max-min-address
 test/conformance/llvm-system-shifts/llvm-system-shifts
 test/conformance/llvm-system-bytes/llvm-system-bytes
 test/conformance/llvm-system-extra/llvm-system-extra
@@ -251,6 +253,7 @@ test/conformance/llvm-real-constant-folding/llvm-real-constant-folding
 test/conformance/vax-shifts/vax-shifts
 test/conformance/vax-move/vax-move
 test/conformance/vax-val/vax-val
+test/conformance/vax-structured-constant-index/vax-structured-constant-index
 test/conformance/vax-structured-constants/vax-structured-constants
 test/conformance/vax-field-initializers/vax-field-initializers
 test/conformance/vax-deferred-wide/vax-deferred-wide
@@ -328,6 +331,8 @@ test/conformance/llvm-coroutines-c-callback/llvm-coroutines-c-callback
 test/conformance/llvm-coroutines-unwind/work/
 test/conformance/llvm-coroutines-valgrind/*.exe
 test/conformance/llvm-coroutines-valgrind/valgrind.log
+test/conformance/llvm-gc-valgrind/*.exe
+test/conformance/llvm-gc-valgrind/valgrind.log
 test/conformance/llvm-tasks/llvm-tasks
 test/conformance/llvm-tasks/llvm-tasks-oc
 test/conformance/llvm-tasks-channels/llvm-tasks-channels

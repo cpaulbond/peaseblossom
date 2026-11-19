@@ -1,0 +1,5 @@
+semantic OK, wrote ConstTables.mar
+exit 0
+ConstTables.mar matches expected-vax.mar
+ConstTables.image matches expected-vax.image
+LLVM build exit 0

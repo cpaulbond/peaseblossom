@@ -1,0 +1,4 @@
+sum 5050
+collections 10
+exit=0
+memcheck: no errors

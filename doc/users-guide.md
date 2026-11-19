@@ -835,6 +835,14 @@ $ ./Fields
 pears  12 9.000000E+00
 ```
 
+Each `OutStr` procedure finds the end of its string by searching from the
+start. For a long run of appends, its twin with `At` added (`CharAt`,
+`StringAt`, `IntAt`, `RealAt`, ...) takes one more parameter, `VAR pos`,
+the index of the string's 0X, and moves it on past what it appends:
+start with `line := ""; pos := 0` and call `OutStr.IntAt(count, 4, line,
+pos)`. If `line` is changed some other way, set `pos` again; a `pos` that
+is not at a 0X is searched forward from, or from the start.
+
 **Mathematics** (`Math`):
 
 <!-- example: runtime/Roots.Mod -->
@@ -1491,6 +1499,12 @@ A program using coroutines, or tasks, can be run under valgrind's memcheck
 on Linux and FreeBSD: each coroutine's stack is registered with valgrind,
 so memcheck follows a switch from one to another. Run natively, the
 registration costs a few instructions per stack.
+
+Any program can be run under memcheck without suppressions for the
+collector: when the program runs under valgrind, the collector tells
+memcheck that each stack word it scans is defined, so a stack slot that
+was never written is not reported for the scan's reads, while the
+program's own use of an undefined value still is.
 
 ## 12. Tasks
 
