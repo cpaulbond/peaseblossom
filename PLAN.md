@@ -1703,6 +1703,47 @@ Those fixed while Phase 18 was current, 8-10, are in
       interface keys (`-key.`), which hash `.sym` files whose layout
       differs between versions of poc while the code is the same.
 
+30. **Three stray tokens before `MODULE` crash poc with a NIL pointer
+    dereference** [fixed]. Found 2026-11-19, with 0.14.0 (a410135) on
+    x86_64, researching UTF-8 support: a source file that starts with a
+    UTF-8 byte order mark (`EF BB BF`) crashes poc. The bytes need not
+    be invalid: any three tokens, or invalid characters, before `MODULE`
+    do it (`###`, `)))`, `# # #`, the three BOM bytes, and the same
+    followed by a newline). One or two (`##`, `EF`, `EF BB`) give
+    ordinary errors and exit status 1. The smallest program:
+
+    ```
+    ###MODULE B; END B.
+    ```
+
+    `poc -check` (or `-compile`) prints the parse errors, then dies,
+    with exit status 4:
+
+    ```
+    C.Mod:1:1: error: expected 'MODULE'
+    C.Mod:1:2: error: expected an identifier
+    C.Mod:1:3: error: expected ';'
+    C.Mod:1:4: error: expected 'END'
+    C.Mod:1:12: error: expected '.'
+    NIL pointer dereference
+    ```
+
+    Whether poc should skip a leading BOM is a separate question, taken
+    up in the UTF-8 research
+    (`~/Repos/Oberon/pounicode/docs/developer/adding-utf8-reading-to-poc.md`).
+    - Cause: the stray tokens are not the point. The parser takes the
+      three as `MODULE`, the module's name and `;`; the name, not an
+      identifier, is NIL after `ExpectIdent` reports it, and the `END
+      B` that follows does name one. `Parser.ReportEndName`, comparing
+      the two, gave up only when the END's name was NIL and dereferenced
+      the block's. `MODULE 1; END B.` and `MODULE B; PROCEDURE 1; END
+      P; END B.` crash the same way, with no stray tokens. One or two
+      stray tokens shift the parse so that the END has no name.
+    - Fixed (2026-11-19): `ReportEndName` reports nothing when either
+      name is missing; `ExpectIdent` has reported the error. Fixture
+      `parser-reject-unnamed-end` has the module, the procedure, `###`
+      and the byte order mark.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
