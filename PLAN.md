@@ -2299,17 +2299,7 @@ Those done while Phase 18 was current, 5-7, are in
 
 ## Open design questions
 
-- **The lowest 32-bit x86 CPU** (deferred from Phase 11 to Phase 12 on
-  2026-09-26, and here at Phase 12's close-out, 2026-10-02, until the test
-  hosts exist).
-  poc passes clang no `-march`, so each OS's default CPU applies: pentium4
-  for i686 Linux (which may use SSE2), i486 for NetBSD, i586 for OpenBSD,
-  i686 for FreeBSD. poc must run on a Pentium II (i686, no SSE), so the
-  question is whether to fix `-march=i686` for every 32-bit x86 triple:
-  the same code on all four OSes and no SSE2 on Linux, at the cost of 486
-  and Pentium machines. x87 reals stay either way. It needs 32-bit x86 test
-  hosts first: a 32-bit NetBSD at least, and a 32-bit FreeBSD if FreeBSD
-  still ships an i386 build (today only OpenBSD, cymoril, is 32-bit x86).
+None at present.
 
 Decided, with the full reasoning in `doc/developer/design-decisions.md` under the
 same names:
@@ -2326,6 +2316,8 @@ same names:
   types of Phase 19 candidate 5)
 - poc on VAX/VMS has no LLVM back end (decided 2026-10-15, Phase 17
   step 7)
+- The lowest 32-bit x86 CPU (decided 2026-11-18:
+  `doc/developer/32-bit-x86-cpu.md`)
 
 ## Critical files
 

@@ -1,0 +1,6 @@
+i686-pc-linux-gnu: -march=i686, no SSE
+i386-unknown-linux-gnu: -march=i686, no SSE
+i486-unknown-netbsdelf: clang's default CPU, no SSE
+i386-unknown-openbsd: clang's default CPU, no SSE
+i686-unknown-freebsd: clang's default CPU, no SSE
+x86_64-unknown-linux-gnu: clang's default CPU, uses SSE

@@ -83,6 +83,12 @@ shells out to these rather than linking against LLVM's own C++ API.
   `"stackrealign"` on `@main` (the one frame that starts misaligned); either
   alone still crashed `sin` on NetBSD. Linux and all 64-bit and ARM targets get
   neither, so their IR is unchanged (`llvm-stack-realign`).
+  **The CPU for 32-bit x86** (2026-11-18): every clang command for a
+  32-bit x86 Linux target gets `-march=i686`, after the `-O` level
+  (`LLVMTypes.TargetCPUOption`); clang's default there, pentium4, uses
+  SSE2, reals included, which the Pentium II poc must run on lacks. Other
+  targets keep
+  clang's default CPU (`32-bit-x86-cpu.md`, fixture `llvm-x86-32-cpu`).
 - **A module's part in C** (Phase 12 step 5a, decided with the user
   2026-10-02): a C file beside a module's source with the same base name
   (`rtl/llvm/Platform.c` beside `Platform.Mod`) is compiled by `clang -c`

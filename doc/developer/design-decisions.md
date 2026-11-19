@@ -451,3 +451,14 @@ questions" - \<name\> means the entry of that name here.
     taken (the user, 2026-10-15): poc on Unix is the cross-compiler that
     makes V1, the kit and every VAX fixture's MACRO-32, and the saving
     would be small there.
+- **The lowest 32-bit x86 CPU**: decided with the user 2026-11-18, the
+  full analysis in `32-bit-x86-cpu.md`. poc gives clang `-march=i686` for
+  a 32-bit x86 Linux target, whose default CPU (pentium4) has clang use
+  SSE2 for real arithmetic, copies and conversions even at `-O0`, which a
+  Pentium II lacks.
+  Every other target keeps clang's default CPU: i486 on NetBSD, i586 on
+  OpenBSD and i686 on FreeBSD are each system's own floor and have no
+  SSE, so capping them too would drop 486 and Pentium machines to gain
+  only `cmov`. Linux's reals move to the x87, as the BSDs' are, with its
+  wider registers at `-opt 1` and up (`LLVMTypes.TargetCPUOption`, fixture
+  `llvm-x86-32-cpu`).

@@ -360,9 +360,12 @@ MODULE LLVMToolchainDriver;
     level[1] := 0X
   END DefaultOptimizationLevel;
 
-  (* Appends clang's options for the target and the optimization level *)
+  (* Appends clang's options for the target, the optimization level and,
+     for 32-bit x86 Linux, the CPU (LLVMTypes.TargetCPUOption): the same
+     for every command, so that a module's part in C and -lto's code
+     generation at the link get the CPU too *)
   PROCEDURE AppendTargetOptions(VAR cmd: ARRAY OF CHAR; triple: ARRAY OF CHAR);
-    VAR level: ARRAY 2 OF CHAR;
+    VAR level: ARRAY 2 OF CHAR; cpu: ARRAY 16 OF CHAR;
   BEGIN
     (* --target matters for a cross build: the .ll file names its own
        triple, but clang only warns about that ("overriding the module
@@ -370,7 +373,8 @@ MODULE LLVMToolchainDriver;
        to silently produce a 64-bit executable. *)
     Strcat(cmd, " --target="); Strcat(cmd, triple);
     IF optimizationLevel[0] = 0X THEN DefaultOptimizationLevel(triple, level) ELSE COPY(optimizationLevel, level) END;
-    Strcat(cmd, " -O"); Strcat(cmd, level)
+    Strcat(cmd, " -O"); Strcat(cmd, level);
+    IF LLVMTypes.TargetCPUOption(triple, cpu) THEN Strcat(cmd, " "); Strcat(cmd, cpu) END
   END AppendTargetOptions;
 
   PROCEDURE RunCommand(): BOOLEAN;
