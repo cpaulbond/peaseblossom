@@ -1744,6 +1744,28 @@ Those fixed while Phase 18 was current, 8-10, are in
       `parser-reject-unnamed-end` has the module, the procedure, `###`
       and the byte order mark.
 
+31. **The VAX back end refuses a structured constant indexed with a
+    variable** [fixed]. Found 2026-11-19, with 0.14.0 (a410135), by
+    another session: `squares[i]`, with `CONST squares = Squares{0, 1,
+    4, 9}` and `i` a variable, gives "the VAX backend cannot lower this
+    yet: this designator as a value"; so do `points[i].x`,
+    `named.values[i]` and `grid[i]` passed to an open array. A
+    constant index works, since the front end folds it, and the LLVM
+    back end takes them all: it addresses the constant's private global
+    as a variable (`LLVMCodeGenerator`, "Structured constants"). The VAX
+    back end has the storage too, `L_CONST_<n>` in `POC_CONST`
+    (`StructuredOperand`, 2026-10-11), but used it only to copy the
+    whole constant or pass its address: `Designator` took only a
+    variable's name, and `Locate`, which applies the selectors, started
+    from `Variable(obj)`.
+    - Fixed (2026-11-19): `Locate` starts from `StructuredOperand` for a
+      record or array constant, and `Designator` passes such a constant
+      with selectors to it, so its elements and fields are selected as a
+      variable's are, index checks included. Fixture
+      `vax-structured-constant-index` (its `expected-vax.mar` not yet
+      reviewed by the user), its program in `test/vax-suite.list` under
+      `-O2` and `-OC`; `vax-macro32-backend.md` says so.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other

@@ -2525,7 +2525,13 @@ or `.LONG`, a quadword two `.LONG`s, a real `.F_FLOATING` or
 `.G_FLOATING` of `RealConstant`'s text. It is used as a variable is:
 copied to assign, its address passed. Record and array literals that
 are not constant are still not lowered. Fixture
-`vax-structured-constants`, run under `-O2` and `-OC`.
+`vax-structured-constants`, run under `-O2` and `-OC`. Selecting from
+one with an index that is not constant (`table[i]`, `points[i].x`,
+`grid[i]` passed to an open array) was refused, "this designator as a
+value", until bug 31 (`PLAN.md`, "Ongoing bug fixing", 2026-11-19):
+`Locate` now starts from its `L_CONST_<n>` as from a variable's storage
+(fixture `vax-structured-constant-index`); a constant index the front
+end folds.
 
 `llvm-readonly-params` joins the list too, under both size models, its
 fourth line an `expected-vax-readonly.out`: `First16`'s read-only `ARRAY 16 OF CHAR` is passed by reference
