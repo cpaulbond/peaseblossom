@@ -1,0 +1,13 @@
+build exit 0
+MIN is the top bit alone: yes
+MAX is one below it: yes
+imported MIN is the same: yes
+imported MAX is the same: yes
+MAX + 1 wraps to MIN: yes
+exit 0
+### i686-unknown-linux-gnu
+    max* = 2147483647;
+    min* = -2147483648;
+### x86_64-unknown-linux-gnu
+    max* = 9223372036854775807;
+    min* = -9223372036854775807 - 1;

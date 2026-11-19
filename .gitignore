@@ -150,6 +150,7 @@ test/conformance/llvm-strings-extra/llvm-strings-extra
 test/conformance/llvm-math/llvm-math
 test/conformance/llvm-mathl/llvm-mathl
 test/conformance/llvm-math-extra/llvm-math-extra
+test/conformance/llvm-max-min-address/llvm-max-min-address
 test/conformance/llvm-system-shifts/llvm-system-shifts
 test/conformance/llvm-system-bytes/llvm-system-bytes
 test/conformance/llvm-system-extra/llvm-system-extra
