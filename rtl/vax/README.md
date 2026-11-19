@@ -44,7 +44,7 @@ come, and what each needs, is in `doc/research/vms-module-inventory.md`.
   proposals 1 and 2).
 - `OutStr.Mod`: `rtl/llvm`'s, a copy kept the same (fixture
   `vax-outstr`), `Out`'s output appended to a string (section 19.9,
-  proposal 3).
+  proposal 3), with the `At` twins that append at a position.
 - `In.Mod`, `InStr.Mod` and `FormattedInput.Mod`: `rtl/llvm`'s. `In`
   reads SYS$INPUT through `Platform.Read(StdIn)`, a record at a time with
   an LF after each, with `Out`'s unfinished line as the prompt when
