@@ -86,3 +86,11 @@ initializer (0.64 s -> 0.47 s): the same gain.
 
 What is left in poc-ir's profile is the front end (`SymbolTable.FindLocal`
 9%, `SemanticActions.FindQualified` 8%) and writing the IR (`fwrite` 9%).
+
+## Bug 28: empty objects and the NIL skip (2026-11-18)
+
+The fix for bug 28 pads an object with no data to one byte, and
+`TraceBlock` no longer passes a NIL pointer field to `MarkCandidate`.
+Marking runs 2.6% fewer instructions, and gcbench and poc-ir are
+unchanged or a little faster. `collector-empty-records.md` has the
+measurements, and those of the fixes not chosen.

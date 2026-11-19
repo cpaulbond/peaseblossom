@@ -114,6 +114,7 @@ test/conformance/llvm-sets/llvm-sets
 test/conformance/llvm-system/llvm-system
 test/conformance/llvm-narrow-index/llvm-narrow-index
 test/conformance/llvm-gc-collect/llvm-gc-collect
+test/conformance/llvm-gc-empty-record/llvm-gc-empty-record
 test/conformance/llvm-gc-tracing/llvm-gc-tracing
 test/conformance/llvm-gc-new/llvm-gc-new
 test/conformance/llvm-console/llvm-console

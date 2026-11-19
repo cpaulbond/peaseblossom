@@ -505,7 +505,7 @@ MODULE GarbageCollectedHeap;
   PROCEDURE TraceBlock(block: SYSTEM.ADDRESS);
     VAR
       tag, data, dataSize, elementSize, pointerCount, offsets, elements, element, index: SYSTEM.ADDRESS;
-      elementBase: SYSTEM.ADDRESS;
+      elementBase, pointer: SYSTEM.ADDRESS;
   BEGIN
     tag := GetWord(block + word);
     IF tag = 0 THEN RETURN END;
@@ -523,7 +523,9 @@ MODULE GarbageCollectedHeap;
       elementBase := data + element * elementSize;
       index := 0;
       WHILE index < pointerCount DO
-        MarkCandidate(GetWord(elementBase + GetWord(offsets + index * word)));
+        pointer := GetWord(elementBase + GetWord(offsets + index * word));
+        (* NIL, the commonest value, needs no search for its chunk *)
+        IF pointer # 0 THEN MarkCandidate(pointer) END;
         INC(index)
       END;
       INC(element)
@@ -791,6 +793,12 @@ MODULE GarbageCollectedHeap;
     VAR need, block, cursor, end: SYSTEM.ADDRESS;
   BEGIN
     IF (dataSize < 0) OR (dataSize > maxObjectSize) THEN RETURN 0 END;
+    (* an empty object takes a byte, so that its data address lies inside
+       its own block: with 8-byte words and no data it would be the next
+       block's start, or the bump, and marking would miss this block (bug
+       28; doc/developer/collector-empty-records.md). Here, not in
+       BlockBytesFor, which sweeping calls for every block. *)
+    IF dataSize = 0 THEN dataSize := 1 END;
     need := BlockBytesFor(dataSize);
     block := TakeBlock(need);
     IF block = 0 THEN
@@ -913,7 +921,8 @@ MODULE GarbageCollectedHeap;
 
   (* A collection, then visit called with each block still allocated, in
      address order: its tag word (as TagOf), the object's data size and
-     the whole block's size in bytes. visit must not allocate. For
+     the whole block's size in bytes (the data size of an object with no
+     data is 1, as Allocate pads it). visit must not allocate. For
      measuring what holds a program's memory (doc/developer/vms-memory.md,
      step 1). *)
   PROCEDURE Census*(visit: CensusVisitor);

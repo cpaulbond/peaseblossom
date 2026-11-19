@@ -1,0 +1,4 @@
+last empty object's block reused: no
+empty objects freed while reachable: 0
+method call on the last one: 42
+method call on a paired one: 42

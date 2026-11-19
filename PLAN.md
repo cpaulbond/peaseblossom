@@ -1626,7 +1626,7 @@ Those fixed while Phase 18 was current, 8-10, are in
     bodies by doubling until the value wraps.
 
 28. **The collector frees an object of a record with no fields while it
-    is still reachable, on 64-bit targets.** Found 2026-11-18 by
+    is still reachable, on 64-bit targets** [fixed]. Found 2026-11-18 by
     pogeminilib (`~/Repos/Oberon/pogeminilib`, its PLAN.md, Phase 4),
     with 0.14.0 under `-OC` on Fedora 44 (x86-64): an abstract
     `Waiter`, an extension of an empty record held in a global, was
@@ -1660,11 +1660,25 @@ Those fixed while Phase 18 was current, 8-10, are in
     END RD.
     ```
 
-    A likely fix, not tried: `BlockBytesFor` (or `Allocate`) gives a
-    `dataSize` of 0 at least one byte, so every object's data address
-    lies inside its own block. Whether anything else allocates 0 bytes
-    (`SYSTEM.NEW(p, 0)`) is not checked. pogeminilib works round it with
-    a field in the empty record.
+    pogeminilib works round it with a field in the empty record.
+    - Fixed (2026-11-18): `Allocate` gives a `dataSize` of 0 one byte,
+      so every object's data address lies inside its own block (16 more
+      bytes per empty object on 64-bit, nothing on 32-bit), and
+      `TraceBlock` no longer looks up a NIL pointer field. Fixture
+      `llvm-gc-empty-record`. `doc/developer/collector-empty-records.md`
+      has the analysis, the other fixes tried, and their costs in time
+      and memory: poc itself allocates no empty objects, and marking
+      runs 2.6% fewer instructions.
+
+29. **`tools/bench/gc-compare.sh`'s poc-ir workload stops at once.** Found
+    2026-11-18 measuring bug 28's fix: its import path is
+    `src/front`, `src/back/llvm` and `rtl/llvm` only, so poc cannot find
+    the VAX back end's modules (`src/back/vax`, `src/back/vax/host`) or
+    `src/driver`, `src/driver/llvm` and `build/gen`, emits nothing, and
+    the script, under `set -e`, ends after printing gcbench's rows with
+    no message. It should use the same import path as
+    `tools/bootstrap/stage1`, with `-clear-library-path
+    -clear-import-path`.
 
 ## Ongoing library enhancements
 
@@ -2241,6 +2255,39 @@ Those done while Phase 18 was current, 5-7, are in
       `WORDSETS`. The MACRO-32 kit, in an empty directory, built all 23
       programs. `HELLO`, `QUEENS` and `WORDSETS` ran as the guides show
       from both.
+
+13. Investigate: the collector turning off valgrind's error reporting
+    while it collects (the user, 2026-11-18; found in posockets and
+    polibtls, putting their task tests under full memcheck now that
+    bug 21 is fixed). The collector scans stacks conservatively, a
+    coroutine's included, so memcheck reports the words it reads that
+    were never written. Most of these reports are in `MarkCandidate`,
+    which each project's `poc-gc.supp` suppresses. But when such a
+    word happens to point at a live, unmarked block, the block is
+    pushed and memcheck reports `Value8` in
+    `GarbageCollectedHeap.DrainMarkStack` / `TraceBlock`. posockets'
+    `TestFileServer` has 22 of these every run
+    (`--track-origins`: stack allocations in `SocketTasks.Await` and
+    `TestFileServer.Whole`), and it now needs a suppression file of its
+    own (`test/TestFileServer.supp`).
+    - The same `DrainMarkStack` report is a real bug elsewhere: a record
+      copied whole from the stack into the heap carries its
+      uninitialised padding (pogeminilib, Phase 2). So the projects
+      keep it out of their shared `poc-gc.supp`, and a blanket
+      suppression would hide that bug.
+    - The idea: wrap a collection in `VALGRIND_DISABLE_ERROR_REPORTING`
+      / `VALGRIND_ENABLE_ERROR_REPORTING` (`rtl/llvm/valgrind.h`, as
+      `Coroutines.c` already uses for bug 21). Or mark each word as
+      defined before testing it as a candidate
+      (`VALGRIND_MAKE_MEM_DEFINED` on a copy).
+    - To investigate:
+      - whether either change keeps memcheck reporting padding copied
+        into the heap, which the program reads (outside the
+        collector), while dropping the scan's own reports;
+      - what it costs outside valgrind (the client requests are a few
+        instructions when not under valgrind);
+      - whether the projects' `poc-gc.supp` files and
+        `TestFileServer.supp` can then go.
 
 ## Open design questions
 

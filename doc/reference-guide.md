@@ -1961,7 +1961,8 @@ MODULE GarbageCollectedHeap;
 
   (* A collection, then visit called with each block still allocated, in
      address order: its tag word (as TagOf), the object's data size and
-     the whole block's size in bytes. visit must not allocate. For
+     the whole block's size in bytes (the data size of an object with no
+     data is 1, as Allocate pads it). visit must not allocate. For
      measuring what holds a program's memory (doc/developer/vms-memory.md,
      step 1). *)
   PROCEDURE Census*(visit: CensusVisitor);
