@@ -1,5 +1,5 @@
 ;; Written by Claude, 2026-11-19, for bug 31 (PLAN.md, "Ongoing bug
-;; fixing"); not yet reviewed by the user. Why this is right:
+;; fixing"); reviewed by the user, 2026-11-19. Why this is right:
 ;; - A structured constant indexed with a variable is selected from its
 ;;   storage in POC_CONST, L_CONST_<n> (section 16, proposal 7), as a
 ;;   variable of its type in POC_DATA would be (Locate): an element in

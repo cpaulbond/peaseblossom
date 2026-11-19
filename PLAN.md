@@ -1762,9 +1762,9 @@ Those fixed while Phase 18 was current, 8-10, are in
       record or array constant, and `Designator` passes such a constant
       with selectors to it, so its elements and fields are selected as a
       variable's are, index checks included. Fixture
-      `vax-structured-constant-index` (its `expected-vax.mar` not yet
-      reviewed by the user), its program in `test/vax-suite.list` under
-      `-O2` and `-OC`; `vax-macro32-backend.md` says so.
+      `vax-structured-constant-index` (its `expected-vax.mar` reviewed
+      by the user, 2026-11-19), its program in `test/vax-suite.list`
+      under `-O2` and `-OC`; `vax-macro32-backend.md` says so.
 
 ## Ongoing library enhancements
 
@@ -2098,6 +2098,48 @@ Those done while Phase 15 was current, 1 and 2, are in
        - polibtls's `Tls.c` (whether a descriptor is non-blocking)
          stays, as expected above, so polibtls doesn't depend on pounix for one
          call.
+
+8.  `In.Peek` (the user, 2026-11-19, for pounicode's
+    `Utf8Files.InRune`, `~/Repos/Oberon/pounicode`): the next byte of
+    standard input, without consuming it.
+
+        PROCEDURE Peek*(VAR ch: CHAR);
+        BEGIN
+          IF input.Ready() THEN ch := nextch; Done := TRUE
+          ELSE ch := 0X; Done := FALSE
+          END
+        END Peek;
+
+    - Why: a UTF-8 decoder must read the byte after a lead byte to
+      learn whether the sequence goes on. Given `E2 'x'`, `InRune`
+      should return U+FFFD and leave the `x` for the next read, as
+      Go's `bufio.Reader.ReadRune` and pounicode's `ReadRune` on a
+      `Files` rider (which `Set`s back) do. `In.Char` is the only way
+      to read a byte, so the `x` is consumed. Without `Peek`,
+      `Utf8Files` must keep a one-byte pushback of its own, which is
+      lost to a program that calls `In.Char` or `In.Line` after an
+      invalid sequence.
+    - Cost: `In` already reads one byte ahead (`nextch`, `readstate`),
+      and its private `StandardInput.Ready` and `Current` already do
+      the work. `Peek` is a call and a test of `readstate`: no new
+      buffering, no extra `getchar`, and no change to the other
+      procedures.
+    - Blocking: at the start or after a line end (`readstate =
+      pending`), `Peek` must call `getchar`, so on a terminal it waits
+      for the next line, as any reader would to answer the question.
+      `InRune` only peeks after a lead byte, where `Advance` has
+      already read the next byte, so correct input never blocks
+      earlier than with `In.Char` alone.
+    - End of input: `Done` is FALSE and `ch` is 0X, as with `In.Char`,
+      so a real 0X byte (`Done` TRUE) is told apart from the end.
+    - Both back ends: `rtl/vax/In.Mod` has the same `nextch` and
+      `readstate` lookahead, so the procedure is the same there.
+    - Not in Oakwood or voc's `In`: it is an addition, like `Card` and
+      `HugeCard`, and goes in the module's head comment and
+      `rtl/llvm/README.md`.
+    - Fixture: `Peek` then `Char` on the same byte; `Peek` twice; `Peek`
+      at the end (Done FALSE); a 0X byte (Done TRUE); a line end, then
+      `Line`.
 
 ## Ongoing language enhancements
 
