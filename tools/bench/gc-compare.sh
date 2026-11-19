@@ -18,7 +18,9 @@
 #             source (which both compilers accept), as in the Stage 1 build
 #
 # Each workload's output must be the same for both trees, or the script
-# stops. Run it on a quiet machine: the BSD test VMs running on the same host
+# stops; poc-ir's is compared without the lines that name interface keys,
+# so that two versions of poc whose symbol files differ only in layout can be
+# compared. Run it on a quiet machine: the BSD test VMs running on the same host
 # add noise. Needs GNU time (/usr/bin/time -f).
 set -e
 
@@ -39,14 +41,38 @@ done
 work=$(mktemp -d "${TMPDIR:-/tmp}/gc-compare.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 
+# clear_options tree: the options that make the tree's poc forget its
+# library and import paths, so that only the paths given follow (neither an
+# installed poc-rtl nor POC_LIBRARY_PATH/POC_IMPORT_PATH); empty for a poc
+# older than those options
+clear_options() {
+  options=""
+  for option in -clear-library-path -clear-import-path; do
+    if grep -q -a -e "$option" "$1/build/stage1/bin/poc"; then
+      options="$options $option"
+    fi
+  done
+  echo "$options"
+}
+
+# poc's own source, in old-tree, as tools/bootstrap/stage1 builds it: the
+# directories old-tree has (an older commit lacks the VAX back end's)
+ir_import_path=""
+for dir in src/front src/back/llvm src/back/vax src/back/vax/host rtl/llvm \
+    src/driver src/driver/llvm build/gen; do
+  if [ -d "$old/$dir" ]; then
+    ir_import_path="$ir_import_path -import-path $old/$dir"
+  fi
+done
+
 # GcBench, built by each tree's poc against its own runtime
 for side in old new; do
   eval tree=\$$side
   mkdir -p "$work/$side/ir"
   cp "$new/tools/bench/GcBench.mod" "$work/$side/"
   (cd "$work/$side" &&
-    "$tree/build/stage1/bin/poc" -OC -import-path "$tree/rtl/llvm" \
-      -o gcbench -build GcBench.mod >build.log 2>&1) ||
+    "$tree/build/stage1/bin/poc" -OC $(clear_options "$tree") \
+      -import-path "$tree/rtl/llvm" -o gcbench -build GcBench.mod >build.log 2>&1) ||
     { cat "$work/$side/build.log" >&2; exit 1; }
 done
 
@@ -60,10 +86,18 @@ run() {
   case $1 in
     gcbench) $prefix "$work/$2/gcbench" >"$work/$2/out" ;;
     poc-ir)
-      $prefix "$tree/build/stage1/bin/poc" -OC -import-path "$old/src/front" \
-        -import-path "$old/src/back/llvm" -import-path "$old/rtl/llvm" \
-        -output-dir "$work/$2/ir" -emit-llvm-ir "$old/src/driver/Poc.Mod" >/dev/null 2>&1
-      cat "$work/$2/ir"/*.ll >"$work/$2/out" ;;
+      rm -f "$work/$2/ir"/*.ll
+      if ! $prefix "$tree/build/stage1/bin/poc" -OC $(clear_options "$tree") \
+          $ir_import_path -output-dir "$work/$2/ir" \
+          -emit-llvm-ir "$old/src/driver/Poc.Mod" >"$work/$2/ir.log" 2>&1; then
+        echo "$0: $2-tree's poc failed on poc-ir:" >&2
+        tail -5 "$work/$2/ir.log" >&2
+        exit 1
+      fi
+      # without the interface keys: a key hashes the imported module's .sym
+      # file, whose layout changes between versions of poc (long lines
+      # wrapped) while the code stays the same
+      cat "$work/$2/ir"/*.ll | sed '/-key\./d' >"$work/$2/out" ;;
   esac
 }
 

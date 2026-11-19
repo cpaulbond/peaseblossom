@@ -1670,7 +1670,8 @@ Those fixed while Phase 18 was current, 8-10, are in
       and memory: poc itself allocates no empty objects, and marking
       runs 2.6% fewer instructions.
 
-29. **`tools/bench/gc-compare.sh`'s poc-ir workload stops at once.** Found
+29. **`tools/bench/gc-compare.sh`'s poc-ir workload stops at once**
+    [fixed]. Found
     2026-11-18 measuring bug 28's fix: its import path is
     `src/front`, `src/back/llvm` and `rtl/llvm` only, so poc cannot find
     the VAX back end's modules (`src/back/vax`, `src/back/vax/host`) or
@@ -1679,6 +1680,13 @@ Those fixed while Phase 18 was current, 8-10, are in
     no message. It should use the same import path as
     `tools/bootstrap/stage1`, with `-clear-library-path
     -clear-import-path`.
+    - Fixed (2026-11-18): the workload uses `tools/bootstrap/stage1`'s
+      import path (the directories the old tree has), and
+      `-clear-library-path -clear-import-path` where the tree's poc has
+      them, for gcbench too. A failure is reported with the end of
+      poc's output. The IR is compared without the lines that name
+      interface keys (`-key.`), which hash `.sym` files whose layout
+      differs between versions of poc while the code is the same.
 
 ## Ongoing library enhancements
 

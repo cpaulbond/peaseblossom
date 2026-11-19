@@ -185,9 +185,10 @@ gcbench workload:
 | gcbench | 11884c6 | 0.36 s | 0.35 s | 16.4 | 6.90 G | 1.75 G |
 | gcbench | fixed | 0.34 s | 0.34 s | 16.1 | 6.86 G | 1.68 G |
 
-The script's poc-ir workload no longer runs, because its import path
-lacks the VAX back end's directories (`PLAN.md`, "Ongoing bug fixing").
-The same workload was run by hand with the full import path: each tree's
+The script's poc-ir workload did not run then, because its import path
+lacked the VAX back end's directories (`PLAN.md`, "Ongoing bug fixing",
+29, since fixed). The same workload was run by hand with the full import
+path: each tree's
 Stage 1 poc emits the LLVM IR for `11884c6`'s source, 7 timed runs and 3
 counted runs per tree. The output was identical.
 
