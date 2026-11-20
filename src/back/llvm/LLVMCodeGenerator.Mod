@@ -2955,6 +2955,8 @@ MODULE LLVMCodeGenerator;
     IF (obj.class = SymbolTable.constClass) & (d.selectors = stopAt) THEN RETURN obj.type END;
     IF IsStructuredConst(obj) THEN
       t := obj.type
+    ELSIF ConstantEvaluator.IsStringConstant(obj) THEN (* indexed: its ARRAY m+1 OF CHAR *)
+      t := ConstantEvaluator.IndexableType(obj)
     ELSIF obj.class = SymbolTable.varClass THEN
       t := EffectiveVarType(cg, obj)
     ELSE
@@ -3582,11 +3584,18 @@ MODULE LLVMCodeGenerator;
       guardObj: SymbolTable.Object; guardHome: SyntaxTree.Ident; guardRec: Types.RecordType;
       binding: LocalBinding; wasPointer: BOOLEAN;
       wordInt, strideText, idxWord, offsetText: ValueText; level, line, column: INTEGER;
+      stringArray: Types.Value;
   BEGIN
     dyn.kind := dynStatic; dyn.text[0] := 0X; ClearDope(dyn.dope);
     obj := ResolveQualifiedObject(cg, d.qualifier, d.name, homeModule);
     IF IsStructuredConst(obj) THEN
       StructuredConstGlobal(cg, obj.value, obj.type, addrText)
+    ELSIF ConstantEvaluator.IsStringConstant(obj) & (d.selectors # NIL) THEN
+      (* indexed, the index not constant: its ARRAY m+1 OF CHAR, a
+         structured constant (doc/developer/language-extensions.md,
+         "Indexing a string constant") *)
+      stringArray := ConstantEvaluator.StringArrayValue(obj);
+      StructuredConstGlobal(cg, stringArray, stringArray.type, addrText)
     ELSIF (obj = NIL) OR (obj.class # SymbolTable.varClass) THEN
       RETURN FALSE
     ELSIF d.qualifier = NIL THEN
@@ -3603,7 +3612,10 @@ MODULE LLVMCodeGenerator;
          moduleScope. *)
       GlobalVariableName(homeModule, obj, addrText)
     END;
-    IF obj.class = SymbolTable.constClass THEN addrType := obj.type ELSE addrType := EffectiveVarType(cg, obj) END;
+    IF ConstantEvaluator.IsStringConstant(obj) THEN addrType := stringArray.type
+    ELSIF obj.class = SymbolTable.constClass THEN addrType := obj.type
+    ELSE addrType := EffectiveVarType(cg, obj)
+    END;
     sel := d.selectors;
     WHILE sel # stopAt DO
       WITH

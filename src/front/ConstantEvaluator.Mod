@@ -71,6 +71,15 @@ MODULE ConstantEvaluator;
 
     maxAshCount = 62; (* voc's maxExp: see EvaluateAsh *)
 
+  TYPE
+    (* A string constant's value and the same value typed as its array
+       (StringArrayValue) *)
+    StringArray = POINTER TO StringArrayDesc;
+    StringArrayDesc = RECORD
+      string, array: Types.Value;
+      next: StringArray
+    END;
+
   VAR
     (* MemoryLayout.sizeModelO2/OC currently in effect for this
        compilation - set once via SetSizeModel* below (default -O2, this
@@ -128,6 +137,9 @@ MODULE ConstantEvaluator;
        under -O2, under which poc's own source must also type-check
        (doc/developer/DEVELOPER.md) *)
     twoTo32: LONGINT;
+
+    (* StringArrayValue's values so far, one for each string value *)
+    stringArrays: StringArray;
 
   PROCEDURE ^ EvaluateExpr(expr: SyntaxTree.ExprNode; scope: SymbolTable.Scope): Types.Value;
   PROCEDURE ^ IsConstant(expr: SyntaxTree.ExprNode; scope: SymbolTable.Scope): BOOLEAN;
@@ -401,6 +413,60 @@ MODULE ConstantEvaluator;
     IF (modObj = NIL) OR (modObj.class # SymbolTable.moduleClass) THEN RETURN NIL END;
     RETURN SymbolTable.FindLocal(modObj.moduleScope, d.name)
   END FindQualifiedConst;
+
+  (* Indexing a string constant (doc/developer/language-extensions.md,
+     "Indexing a string constant"; the user, 2026-11-19): a string
+     constant of m characters acts as a read-only ARRAY m+1 OF CHAR, its
+     last element 0X, so it can be indexed and given to LEN. A CHAR
+     constant (41X, or a one-character string the checker took as one)
+     is not a string here; nor is a literal, which is not an object. *)
+  PROCEDURE IsStringConstant*(obj: SymbolTable.Object): BOOLEAN;
+  BEGIN
+    RETURN (obj # NIL) & (obj.class = SymbolTable.constClass) & (obj.value # NIL)
+           & (obj.value.kind = Types.stringValue) & (obj.value.stringVal # NIL)
+  END IsStringConstant;
+
+  (* The string constant obj's value as its ARRAY m+1 OF CHAR
+     (IsStringConstant): the same value for the same string each time,
+     since a back end keys a constant's storage by its value
+     (LLVMCodeGenerator.StructuredConstGlobal,
+     VaxCodeGenerator.StructuredOperand) *)
+  PROCEDURE StringArrayValue*(obj: SymbolTable.Object): Types.Value;
+    VAR c: StringArray; length: LONGINT;
+  BEGIN
+    c := stringArrays;
+    WHILE (c # NIL) & (c.string # obj.value) DO c := c.next END;
+    IF c = NIL THEN
+      NEW(c); c.string := obj.value; NEW(c.array); c.array^ := obj.value^; c.array.next := NIL;
+      length := 0;
+      WHILE obj.value.stringVal[length] # 0X DO INC(length) END;
+      c.array.type := Types.NewArrayType(Types.Char, length + 1, FALSE);
+      c.next := stringArrays; stringArrays := c
+    END;
+    RETURN c.array
+  END StringArrayValue;
+
+  (* The string constant expr names, by itself (no selector, no
+     parentheses), as LEN's argument: else NIL *)
+  PROCEDURE NamedStringConstant*(expr: SyntaxTree.ExprNode; scope: SymbolTable.Scope): SymbolTable.Object;
+    VAR de: SyntaxTree.DesignatorExprNode; obj: SymbolTable.Object;
+  BEGIN
+    IF (expr = NIL) OR ~(expr IS SyntaxTree.DesignatorExprNode) THEN RETURN NIL END;
+    de := expr(SyntaxTree.DesignatorExprNode);
+    IF de.hasParens OR (de.designator.selectors # NIL) THEN RETURN NIL END;
+    obj := FindQualifiedConst(scope, de.designator);
+    IF ~IsStringConstant(obj) THEN obj := NIL END;
+    RETURN obj
+  END NamedStringConstant;
+
+  (* The type obj has where it is indexed or given to LEN: a string
+     constant's ARRAY m+1 OF CHAR (StringArrayValue), else its own *)
+  PROCEDURE IndexableType*(obj: SymbolTable.Object): Types.Type;
+    VAR array: Types.Value;
+  BEGIN
+    IF IsStringConstant(obj) THEN array := StringArrayValue(obj); RETURN array.type END;
+    RETURN obj.type
+  END IndexableType;
 
   (* MAX(T)/MIN(T)/SIZE(T)'s argument position holds a bare *type* name,
      never a value - PredeclaredProcedures.Mod's own CheckMaxMin/CheckSize
@@ -967,8 +1033,8 @@ MODULE ConstantEvaluator;
       idx: SyntaxTree.ExprNode;
   BEGIN
     obj := FindQualifiedConst(scope, d);
-    IF (obj = NIL) OR (obj.class # SymbolTable.varClass) THEN RETURN NIL END;
-    t := obj.type; sel := d.selectors;
+    IF (obj = NIL) OR (obj.class # SymbolTable.varClass) & ~IsStringConstant(obj) THEN RETURN NIL END;
+    t := IndexableType(obj); sel := d.selectors;
     WHILE (sel # NIL) & (t # NIL) DO
       WITH
         sel: SyntaxTree.FieldSelector DO
@@ -1117,6 +1183,11 @@ MODULE ConstantEvaluator;
     END;
     IF IsConstantPredeclaredVal(expr, scope) THEN RETURN EvaluatePredeclaredVal(expr, scope) END;
     IF IsLenCall(expr, scope) THEN
+      IF NamedStringConstant(expr.args, scope) # NIL THEN
+        (* as PredeclaredProcedures.CheckLen, for a CONST's value, which
+           only this module sees *)
+        Diagnostics.NotInReport(expr.line, expr.column, "LEN of a string constant")
+      END;
       IF FixedLength(expr.args, scope, length) THEN RETURN TypedInteger(length, Types.LongInt) END;
       Diagnostics.Error(expr.line, expr.column, "not a constant expression: LEN of an open array");
       RETURN UndefinedValue()
@@ -1146,6 +1217,11 @@ MODULE ConstantEvaluator;
       IF (obj # NIL) & (obj.class = SymbolTable.constClass) & (obj.value # NIL)
          & (obj.value.kind = Types.structuredValue) & ConstantSelectors(d.selectors, scope) THEN
         RETURN SelectFromValue(obj.value, d.selectors, scope)
+      ELSIF IsStringConstant(obj) & ConstantSelectors(d.selectors, scope) THEN
+        (* as SemanticActions.CheckDesignator, for a CONST's value or a
+           CASE label, which only this module sees *)
+        Diagnostics.NotInReport(d.line, d.column, "indexing a string constant");
+        RETURN SelectFromValue(StringArrayValue(obj), d.selectors, scope)
       END
     END;
     IF (d.selectors # NIL) OR expr.hasParens THEN
@@ -2417,7 +2493,8 @@ MODULE ConstantEvaluator;
     IF (d.selectors # NIL) & ~expr.hasParens THEN
       obj := FindQualifiedConst(scope, d);
       RETURN (obj # NIL) & (obj.class = SymbolTable.constClass) & (obj.value # NIL)
-             & (obj.value.kind = Types.structuredValue) & ConstantSelectors(d.selectors, scope)
+             & ((obj.value.kind = Types.structuredValue) OR IsStringConstant(obj))
+             & ConstantSelectors(d.selectors, scope)
     END;
     IF d.selectors # NIL THEN RETURN FALSE END;
     IF expr.hasParens THEN

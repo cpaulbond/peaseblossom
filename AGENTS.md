@@ -469,6 +469,14 @@ not, and is itself a constant. `.sym` writes `VAL(CARDINAL, k)`. `In` and
 `InStr` get `HugeCard`. `-strict` rejects all five. The VAX backend has
 them too (`doc/developer/predeclared-unsigned-types.md` has the plan).
 
+### Indexing a string constant (decided and implemented 2026-11-19)
+
+A string constant of m characters, own or imported, is a read-only `ARRAY
+m+1 OF CHAR` when indexed: `s[k]` with `k` constant is a `CHAR` constant
+(`CONST`, `CASE` labels), `s[i]` is index-checked (trap 2), `LEN(s)` is
+the constant m+1. Not a variable; a `41X` constant or a literal takes no
+index. No `.sym` change. `-strict` rejects it. Both back ends.
+
 ### Threads and signal handlers (decided 2026-11-13; Phase 19, candidate 7)
 
 A program has one thread and must not start another, from C either: the

@@ -1,0 +1,14 @@
+bad.mod:6:38: error: index out of range
+bad.mod:13:3: error: assignment target is not a variable
+bad.mod:14:5: error: a VAR parameter requires a variable argument
+bad.mod:15:8: error: SYSTEM.ADR requires a variable
+bad.mod:16:3: error: INC/DEC's argument must be a writable variable
+bad.mod:17:11: error: '[' requires an array or a pointer to an array
+bad.mod:18:14: error: LEN's dimension exceeds the array's rank
+bad.mod:19:11: error: constant array index is out of range
+bad.mod:20:11: error: constant array index is out of range
+bad.mod:21:14: error: '[' requires an array or a pointer to an array
+bad.mod:22:10: error: '.' requires a record or a pointer to a record
+bad.mod:23:10: error: '^' requires a pointer
+bad.mod:24:16: error: index out of range
+13 error(s)

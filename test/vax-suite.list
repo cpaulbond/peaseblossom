@@ -174,6 +174,8 @@ vax-structured-constants ConstOut.mod -O2
 vax-structured-constants ConstOut.mod -OC
 vax-structured-constant-index TableOut.mod -O2
 vax-structured-constant-index TableOut.mod -OC
+vax-string-constant-index StringOut.mod -O2
+vax-string-constant-index StringOut.mod -OC
 llvm-extension-through-pointers lsb.mod -O2
 llvm-extension-through-pointers lsb.mod -OC
 vax-field-initializers FieldsOut.mod -O2

@@ -2531,7 +2531,10 @@ one with an index that is not constant (`table[i]`, `points[i].x`,
 value", until bug 31 (`PLAN.md`, "Ongoing bug fixing", 2026-11-19):
 `Locate` now starts from its `L_CONST_<n>` as from a variable's storage
 (fixture `vax-structured-constant-index`); a constant index the front
-end folds.
+end folds. An indexed string constant (`language-extensions.md`,
+"Indexing a string constant", 2026-11-19) is the same: `Locate` starts
+from the data `StructuredOperand` writes for its `ARRAY m+1 OF CHAR`
+value (fixture `vax-string-constant-index`).
 
 `llvm-readonly-params` joins the list too, under both size models, its
 fourth line an `expected-vax-readonly.out`: `First16`'s read-only `ARRAY 16 OF CHAR` is passed by reference

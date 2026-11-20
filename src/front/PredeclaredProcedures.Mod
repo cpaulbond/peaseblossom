@@ -270,6 +270,7 @@ MODULE PredeclaredProcedures;
   PROCEDURE CheckLen(scope: SymbolTable.Scope; args: SyntaxTree.ExprNode;
                      line, column: INTEGER; checkExpr: CheckExprProc): Types.Type;
     VAR vt: Types.Type; nVal: Types.Value; cur: Types.ArrayType; i: LONGINT; ok: BOOLEAN;
+      stringConst: SymbolTable.Object;
   BEGIN
     IF (ArgCount(args) < 1) OR (ArgCount(args) > 2) THEN
       Diagnostics.Error(line, column, "LEN expects one or two arguments");
@@ -277,6 +278,14 @@ MODULE PredeclaredProcedures;
     END;
     vt := checkExpr(scope, Arg(args, 0));
     IF vt = Types.Undefined THEN RETURN Types.Undefined END;
+    stringConst := ConstantEvaluator.NamedStringConstant(Arg(args, 0), scope);
+    IF stringConst # NIL THEN
+      (* a string constant's ARRAY m+1 OF CHAR
+         (doc/developer/language-extensions.md, "Indexing a string
+         constant") *)
+      Diagnostics.NotInReport(line, column, "LEN of a string constant");
+      vt := ConstantEvaluator.IndexableType(stringConst)
+    END;
     IF ~(vt IS Types.ArrayType) THEN
       ReportType(line, column, "LEN requires an array argument", vt);
       RETURN Types.Undefined

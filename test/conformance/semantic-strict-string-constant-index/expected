@@ -1,0 +1,10 @@
+strict.mod:6:24: error: indexing a string constant is not in the Oberon-2 report (-strict)
+strict.mod:6:34: error: LEN of a string constant is not in the Oberon-2 report (-strict)
+strict.mod:7:38: error: LEN of a string constant is not in the Oberon-2 report (-strict)
+strict.mod:13:9: error: indexing a string constant is not in the Oberon-2 report (-strict)
+strict.mod:13:21: error: indexing a string constant is not in the Oberon-2 report (-strict)
+strict.mod:13:39: error: LEN of a string constant is not in the Oberon-2 report (-strict)
+strict.mod:13:52: error: LEN of a string constant is not in the Oberon-2 report (-strict)
+strict.mod:14:14: error: indexing a string constant is not in the Oberon-2 report (-strict)
+8 error(s)
+semantic OK

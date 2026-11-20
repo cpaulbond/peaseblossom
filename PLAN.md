@@ -2244,6 +2244,21 @@ Those done while Phase 17 was current, 3, are in
    `llvm-predeclared-val`, `vax-predeclared-cardinal`,
    `vax-predeclared-val`).
 
+6. **Indexing a string constant** [done] (found in polibtls, 2026-11-15, poc
+   0.13.0; recorded 2026-11-19): with `CONST certs = "..."`, poc refuses
+   `certs[i]` ("'[' requires an array or a pointer to an array") and
+   `LEN(certs)`, and polibtls passes the constant as a value `ARRAY OF
+   CHAR` parameter to index it. `Oberon2.pdf` does not allow it (§8.1
+   indexes only an array; a string constant is not one), nor does voc
+   (err 79, err 131). Proposals S1-S8 in
+   `doc/developer/language-extensions.md`, "Indexing a string constant":
+   the constant read as a read-only `ARRAY m+1 OF CHAR`, `s[k]` folded,
+   `s[i]` index-checked, `LEN(s)` the constant `m+1`, `-strict` rejecting
+   both; approved by the user and implemented 2026-11-19, on both back
+   ends (fixtures `llvm-string-constant-index`,
+   `semantic-reject-string-constant-index`,
+   `semantic-strict-string-constant-index`, `vax-string-constant-index`).
+
 ## Ongoing implementation enhancements
 
 Changes to how poc builds, links and packages programs and libraries that

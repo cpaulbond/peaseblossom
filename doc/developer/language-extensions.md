@@ -2145,3 +2145,107 @@ What a program will be able to observe:
     remembered `$WAKE`.
 - `Coroutines` gets one export for `Tasks`, a `Transfer` without the
   AST-level check; calling it otherwise is undefined.
+
+## Indexing a string constant (decided and implemented 2026-11-19)
+
+Found in polibtls (its `AGENTS.md`, 2026-11-15, poc 0.13.0): with
+`CONST certs = "..."`, `certs[i]` is refused ("'[' requires an array or
+a pointer to an array"), and so is `LEN(certs)` ("LEN requires an array
+argument: a string constant"). The workaround passes the constant as a
+value `ARRAY OF CHAR` parameter and indexes that. The proposals below,
+S1-S8, were approved by the user on 2026-11-19 and implemented the same
+day, on both back ends.
+
+**What the report says.** Nothing allows it. §8.1: "If a designates an
+array, then a[e] denotes that element of a"; a string constant is not
+an array, but a constant of its own kind (§3.4; Appendix A and §10.3
+list "string" apart from "character array"). `LEN(v)` takes an array
+(§10.3). What a program can do with a string constant is: assign it to
+an `ARRAY n OF CHAR` of more than its length, or `COPY` it into one
+(assignment compatible, 6); pass it as a value `ARRAY OF CHAR`
+parameter (array compatible, 3), where it is an array of its
+characters and a 0X, so `s[i]` and `LEN(s)` work in the procedure, as
+in the report's own `WriteString`; compare it (§8.2.4); and use one of
+length 1 as a `CHAR` constant (§3.4). To index a string constant the
+report has you make it an array first.
+
+**Survey.** None of the reports at hand indexes a string constant.
+voc refuses both: `s[i]` is "err 79 indexed object is not a variable",
+`LEN(s)` "err 131 LEN not applied to array". Oberon-07 (2016) has the
+same §8.1 rule and `LEN(v)` of an array only. The Revised Oberon-2
+(Pirklbauer, 2020) adds exporting and importing string constants and
+nothing more. Component Pascal has string types, selects a whole string
+from an array with `a$`, not a character from a string, and gives
+`LEN(string)` as "length of string", which excludes the 0X: the one
+place where the proposal below differs from another dialect.
+
+**S1. Indexing.** A designator naming a string constant, a module's own
+or an imported one (`s`, `M.s`), may take one index, `s[e]`, `e` of an
+integer type. The constant is then an `ARRAY m+1 OF CHAR` of its `m`
+characters and a 0X, read-only: `s[m]` is 0X. This is what the same
+string is as a value `ARRAY OF CHAR` parameter, so code moved from a
+procedure into a module body, or back, keeps its meaning. Only a
+constant whose value is a string: one written in quotes, `"a"`
+included, or declared from one (`CONST t = M.s`). A character constant
+written `41X`, or folded from `CHR`, is a `CHAR`, never indexed. A
+string literal is not a designator and takes no selector (`"abc"[1]`
+stays a syntax error).
+
+**S2. A constant index.** `s[k]`, `k` constant, is a constant `CHAR`,
+folded on both back ends: usable in a constant expression (`CONST first
+= s[0]`), a `CASE` label, anywhere a `CHAR` constant is. `k` outside
+`0..m` is a compile-time error, as for a fixed array: "constant array
+index is out of range" in a statement, "index out of range" in a
+constant expression or a `CASE` label, as for a structured constant.
+
+**S3. A variable index.** `s[i]` reads the string's stored copy (the one
+each module already makes when it passes the string or compares with
+it), after the index check a fixed array gets: outside `0..m` it traps
+with status 2, "index out of range" (`-trap-location` as usual).
+
+**S4. `LEN`.** `LEN(s)` and `LEN(s, 0)` are the constant `m+1`, with the
+rules of `LEN` of a fixed array's dimension: a `LONGINT` constant,
+assignable wherever its value fits. `LEN(s, 1)` and up are errors.
+Component Pascal's `LEN` of a string, `m`, was considered: `m+1` keeps
+`LEN` and the index range together (`FOR i := 0 TO LEN(s) - 1`), and is
+what a value `ARRAY OF CHAR` parameter given the same string reports.
+
+**S5. Read-only.** `s[i]` is not a variable: assigning to it, passing it
+as a `VAR` actual or a `VAR` receiver, `SYSTEM.ADR(s[i])`, and `INC`,
+`DEC`, `INCL`, `EXCL`, `NEW`, `GET` or `PUT` with it are errors, with the
+error a constant already gets there. As a value or `x-` actual it is a
+`CHAR`.
+
+**S6. `-strict`.** Rejects an index on a string constant and `LEN` of
+one, in the command-line module's own source, as every extension.
+
+**S7. Back ends.** Both. The LLVM back end folds S2 through
+`ConstantEvaluator`, as it does a constant selection from a structured
+constant since bug 32, and addresses the string's private global for
+S3. The VAX back end folds S2 as it does every constant expression,
+and indexes the string's `L_CONST_<n>`-style data for S3. An imported
+`M.s` is a copy in the importing module, as a string passed by name is
+now; the `.sym` file needs no change.
+
+**S8. Not proposed.** A string literal with a selector (S1); an
+indexed `CHAR` constant (S1); slices or `a$`; string concatenation
+(`+`, refused in `pofltk` too and not Oberon-2); a structured constant
+of `ARRAY n OF CHAR` written from a string (`Name("abc")` or
+`Name{"abc"}`), which a later item could add.
+
+**Implementation.** `ConstantEvaluator` reads such a constant as a
+value of type `ARRAY m+1 OF CHAR` (`IsStringConstant`,
+`StringArrayValue`, cached per string, and `IndexableType`) and folds
+`s[k]` and `LEN(s)` through the selection it already does for
+structured constants; `SemanticActions.CheckDesignator` and
+`PredeclaredProcedures`' `LEN` type `s[e]` and `LEN(s)` from it. The
+LLVM back end addresses the array as a structured constant's private
+global, and the VAX back end's `Locate` starts from its `L_CONST_<n>`,
+as bug 31 made it do for a structured constant. Fixtures:
+`llvm-string-constant-index` (constant and variable index, `LEN`, an
+imported constant, a `CASE` label, `CONST first = s[0]`, the index
+trap, the IR folding a constant index),
+`semantic-reject-string-constant-index` (an out-of-range constant
+index, assignment, a `VAR` actual, `ADR`, `INC`, `LEN(s, 1)` and a `CHAR`
+constant; a literal is a parse error), `semantic-strict-string-constant-index` and
+`vax-string-constant-index` (under `-O2` and `-OC`).

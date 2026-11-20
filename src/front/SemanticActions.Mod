@@ -1965,7 +1965,13 @@ MODULE SemanticActions;
       (* a read-only parameter is read-only wherever it is seen, as an
          imported read-only variable is outside its module *)
       readOnly := (crossedBoundary & obj.readOnly) OR (isVariable & obj.isReadOnlyParam);
-      t := obj.type
+      t := obj.type;
+      IF (d.selectors # NIL) & ConstantEvaluator.IsStringConstant(obj) THEN
+        (* indexed: its ARRAY m+1 OF CHAR (doc/developer/language-extensions.md,
+           "Indexing a string constant") *)
+        Diagnostics.NotInReport(d.line, d.column, "indexing a string constant");
+        t := ConstantEvaluator.IndexableType(obj)
+      END
     ELSIF obj.class = SymbolTable.procClass THEN
       t := obj.type (* a real Types.ProcedureType, or Types.PredeclaredProcedureType *)
     ELSE

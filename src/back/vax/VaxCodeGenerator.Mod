@@ -1933,12 +1933,18 @@ MODULE VaxCodeGenerator;
      dynamic type and narrows the static one (Guard). obj may be a
      structured constant, its selectors applied to its storage in
      POC_CONST as to a variable's: a constant index the checker has folded
-     already, so a variable one (bug 31). *)
+     already, so a variable one (bug 31); or a string constant, as its
+     ARRAY m+1 OF CHAR. *)
   PROCEDURE Locate(d: SyntaxTree.Designator; obj: SymbolTable.Object; line, column: INTEGER): Operand;
     VAR x: Operand; sel: SyntaxTree.Selector; e: SyntaxTree.ExprNode; rec: Types.RecordType; f: Types.Field;
         text: ARRAY 160 OF CHAR; whole: BOOLEAN;
   BEGIN
     IF IsStructuredConstObject(obj) THEN x := StructuredOperand(obj.value)
+    ELSIF ConstantEvaluator.IsStringConstant(obj) THEN
+      (* indexed: its ARRAY m+1 OF CHAR, a structured constant
+         (doc/developer/language-extensions.md, "Indexing a string
+         constant") *)
+      x := StructuredOperand(ConstantEvaluator.StringArrayValue(obj))
     ELSE x := Variable(obj, line, column)
     END;
     sel := d.selectors; whole := TRUE; (* still obj itself, but for guards *)
@@ -3005,8 +3011,9 @@ MODULE VaxCodeGenerator;
          checker allows nowhere else (PLAN.md, "Ongoing language
          enhancements", item 3) *)
       RETURN ProcedureValue(obj, dest, e.line, e.column)
-    ELSIF IsStructuredConstObject(obj) & (d.selectors # NIL) THEN
-      (* an element or a field of one, its selector not constant *)
+    ELSIF (IsStructuredConstObject(obj) OR ConstantEvaluator.IsStringConstant(obj)) & (d.selectors # NIL) THEN
+      (* an element or a field of one, its selector not constant; or a
+         character of a string constant, its index not constant *)
       RETURN Locate(d, obj, e.line, e.column)
     ELSIF (obj = NIL) OR (obj.class # SymbolTable.varClass) THEN
       Unsupported(e.line, e.column, "this designator as a value"); RETURN Dummy()

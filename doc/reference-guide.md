@@ -226,6 +226,32 @@ memory, checked as usual. A pointer or procedure element of one is `NIL`. An
 exported one's type must have a name the `.sym` file can use: a type of the
 module, or an exported one of an import.
 
+### Indexing a string constant
+
+```oberon
+CONST hex = "0123456789ABCDEF"; first = hex[0];
+...
+  ch := hex[n MOD 16];
+  FOR i := 0 TO LEN(hex) - 2 DO ... END
+```
+
+A string constant of *m* characters, the module's own or an imported one
+(`hex`, `M.hex`), may be indexed as a read-only `ARRAY m+1 OF CHAR` of its
+characters and a 0X: what it is as a value `ARRAY OF CHAR` parameter.
+`hex[k]`, `k` constant, is a `CHAR` constant, usable in a constant
+expression and a `CASE` label; `k` outside 0..*m* is a compile-time error.
+An index that is not constant reads a copy of the string in memory,
+checked as a fixed array's (trap 2). `LEN(hex)` and `LEN(hex, 0)` are the
+constant *m*+1, a `LONGINT` assignable wherever its value fits. `hex[i]`
+is not a variable: it cannot be assigned, passed as a `VAR` parameter, or
+given to `SYSTEM.ADR`, `INC` and the like. A character constant written
+`41X` is a `CHAR` and takes no index, and a string literal takes no
+selector (`"abc"[1]` is a syntax error).
+
+Under `-strict` each is an error: `indexing a string constant is not in the
+Oberon-2 report (-strict)` and `LEN of a string constant is not in the
+Oberon-2 report (-strict)`.
+
 ### Declarations after procedures
 
 `CONST`, `TYPE` and `VAR` sections may follow procedures, in a module and in
