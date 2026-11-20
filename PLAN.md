@@ -1766,6 +1766,52 @@ Those fixed while Phase 18 was current, 8-10, are in
       by the user, 2026-11-19), its program in `test/vax-suite.list`
       under `-O2` and `-OC`; `vax-macro32-backend.md` says so.
 
+32. **The LLVM back end does not fold a selector on a structured constant
+    in a statement**.
+    Found 2026-11-19, with 0.14.0 (a410135) on x86_64, testing
+    re-exported structured constants ("Ongoing implementation
+    enhancements", 14). `squares[2]`, with `CONST squares = Squares{0,
+    1, 4, 9}`, and `o.y`, with `CONST o = M3.Point{x := 5, y := 6}`, in
+    a statement are loads from the module's private copy
+    (`@L.-const.<n>`), with a run-time index check on constants
+    (`icmp sge i8 1, 0`, `icmp slt i8 1, 2`), not the constants 4 and 6.
+    The same with an imported constant (`M3.origin.x`,
+    `M3.identity[1,1]`) and a re-exported one (`M2.origin.x`, M2
+    declaring `origin* = M3.origin`). In a constant declaration it is
+    folded: `CONST ox = M3.origin.x` is 0.
+    - The language says they are constants:
+      `doc/developer/record-and-array-literals.md` makes a selector of a
+      structured constant, with constant indexes, a constant expression,
+      folded like any other, and says the importer folds `M.Origin.x`.
+      The front end does: `ConstantEvaluator.IsConstantExpr` is TRUE of
+      `squares[2]` and `o.y`, and `Evaluate` gives 4 and 6.
+    - The VAX back end folds them already (checked 2026-11-19):
+      `VaxCodeGenerator`'s expression code asks `IsConstantExpr` of every
+      expression first, so `i := squares[2]` is `MOVW #4, ...` and `o.y`
+      is pushed as `#6`, with no `L_CONST_<n>`.
+    - The LLVM back end does not: `GenerateExpr`
+      (`src/back/llvm/LLVMCodeGenerator.Mod`) folds only unary, binary
+      and set expressions and some calls, through
+      `GenerateFoldedInteger`, and only to an integer or a set; a
+      designator goes to `GenerateDesignatorValue`, which addresses the
+      constant's global.
+    - The cost: a copy of the constant in every module that selects from
+      it, even when every selector is constant, and the checks and loads
+      at `-O0` (LLVM folds them when optimizing, the global being
+      constant and its initializer known).
+    - To fix, in the LLVM back end only: in `GenerateExpr`'s designator
+      branch, a designator with selectors that `IsConstantExpr` says is
+      constant, and whose type is not a record or an array
+      (`identity[1]` still needs the global), is emitted as its folded
+      value, as on the VAX: of any basic type, not only an integer or a
+      set (a `REAL`, `CHAR` or `BOOLEAN` field too), so no copy is made
+      unless the constant is passed, selected whole or indexed with a
+      variable. A fixture: a local, an imported and a re-exported
+      constant, a record field of each basic type, a one- and a
+      two-dimensional index, with the IR showing no `-const.` global and
+      no index check; the VAX fixture `vax-structured-constant-index`
+      already covers a variable index there.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
@@ -2446,6 +2492,52 @@ Those done while Phase 18 was current, 5-7, are in
       `test/valgrind.supp`, posockets' `test/TestFileServer.supp`),
       and pogeminilib copies the record whole again and corrects its
       note about padding.
+
+14. Structured constants re-exported, and the copies of them each module
+    makes [not to be done until a program shows the cost] (the user,
+    2026-11-19; a test of re-exporting, M3 exporting
+    `origin* = Point{...}` and `identity* = Matrix{{1, 0}, {0, 1}}`, M2
+    re-exporting them as `origin* = M3.origin`, M1 printing
+    `M2.origin.x` and `M2.identity[1,1]`). It works, and the constants
+    have no storage of their own, by design
+    (`doc/developer/record-and-array-literals.md`, "In memory"): neither
+    M3.o nor M2.o defines a symbol for them, M2.sym carries the value
+    folded to its literal, `origin* = M3.Point{x := 0, y := 0}`, not a
+    reference to M3's, and M1 makes its own `@M1.-const.<n>`, a private
+    constant global. A re-export is an alias of the value, not of a
+    location; as a constant has no address, nothing can tell. What the
+    test showed could be better:
+    - **A selector with constant operands is not folded in a statement.**
+      `M2.origin.x` and `M2.identity[1,1]` load from M1's copy, with a
+      run-time index check on constants. It is a bug, not the
+      re-export's, and not only an imported constant's: "Ongoing bug
+      fixing", 32.
+    - **One module can hold two copies of one constant.**
+      `StructuredConstGlobal` (`src/back/llvm/LLVMCodeGenerator.Mod`)
+      shares a global by the `Types.Value` it holds, and `M3.origin` and
+      `M2.origin` are two values read from two .sym files, so a module
+      using both gets `@M5.-const.1` and `-const.2`, equal. Share them by
+      type and contents instead. (`unnamed_addr` lets LLVM merge them
+      when optimizing; this is about `-O0` and the VAX.)
+    - **To decide with the user: one copy for the program.** Each
+      importer that needs memory still has its own. A shared one would
+      be a `linkonce_odr` global with a name from the exporting module
+      and the constant (`@M3.origin`, kept in a comdat), which a
+      re-exporter's .sym would have to name back to M3; or the exporter
+      would define it, and an importer would then link to it, as now it
+      does not. Small constants likely do not repay that; a large table
+      used in many modules might. Either way the .sym keeps the value,
+      so the compiler folds what it can as now; the shared global is only
+      the copy in memory, for passing the constant or indexing it with a
+      variable.
+    - **Not to be done until a program shows the cost** (the user,
+      2026-11-19). Once bug 32 is fixed, a copy is made only for a
+      constant passed, selected whole or indexed with a variable;
+      `unnamed_addr` lets LLVM merge equal copies when optimizing, and
+      across modules under `-lto`; and one copy for the program would
+      tie a re-exporter's .sym to the exporter's and need its own design
+      on the VAX, whose object language has no comdat. Bug 32 is fixed
+      on its own, under "Ongoing bug fixing".
 
 ## Open design questions
 
