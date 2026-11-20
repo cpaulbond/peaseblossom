@@ -4,9 +4,10 @@ MODULE In;
      input from the standard input stream, with voc's interface (src/
      runtime/In.Mod): Open, Char, Int, LongInt, HugeInt, Real, LongReal,
      Line, String, Name and the flag Done; and poc's Card and HugeCard, which
-     read a value of the unsigned types. Each reads what it can from the
-     stream, sets Done to say whether it found what it was asked for, and
-     leaves its argument alone (or, for some, zero) when it did not.
+     read a value of the unsigned types, and Peek, the next character left
+     unread. Each reads what it can from the stream, sets Done to say
+     whether it found what it was asked for, and leaves its argument alone
+     (or, for some, zero) when it did not.
 
      The stream is read a character at a time through C's getchar, which is
      the same on Linux and the BSDs and buffered by libc, and one character
@@ -104,6 +105,17 @@ MODULE In;
   BEGIN
     Done := FormattedInput.Char(input, ch)
   END Char;
+
+  (* The next character as Char gives it, but left unread: the next Peek,
+     Char or other read starts with it. Done is FALSE, and ch 0X, at the
+     end of the input. After a line end it waits for the next line, as
+     Char does. *)
+  PROCEDURE Peek*(VAR ch: CHAR);
+  BEGIN
+    IF input.Ready() THEN ch := nextch; Done := TRUE
+    ELSE ch := 0X; Done := FALSE
+    END
+  END Peek;
 
   (* An integer: an optional minus sign, then decimal digits, or
      hexadecimal digits (0-9, A-F) and an H. *)

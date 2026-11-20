@@ -75,7 +75,8 @@ listed below. Must run on Linux, NetBSD, OpenBSD, and FreeBSD (see
   `REAL`/`LONGREAL` correctly rounded (`RealDigits.Mod`, big-integer
   arithmetic, no floating point); `In` reads standard input with
   `getchar`, its tokens recognized by `FormattedInput`, and real numbers
-  with libc's `strtod`/`strtof`.
+  with libc's `strtod`/`strtof`. `In`'s `Card`, `HugeCard` and `Peek` (the
+  next character, left unread) are poc's own.
 - `OutStr.Mod`, `InStr.Mod` - `Out`'s output procedures appending to a
   string, and `In`'s reading from a string at a position it moves on
   (`PLAN.md`, "Ongoing library enhancements"). poc's own: voc has neither.

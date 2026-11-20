@@ -2157,7 +2157,13 @@ Those done while Phase 15 was current, 1 and 2, are in
 
 8.  `In.Peek` (the user, 2026-11-19, for pounicode's
     `Utf8Files.InRune`, `~/Repos/Oberon/pounicode`): the next byte of
-    standard input, without consuming it.
+    standard input, without consuming it. [done]
+    - Done (2026-11-19): as proposed, in `rtl/llvm/In.Mod` and
+      `rtl/vax/In.Mod`, named in both head comments and in
+      `rtl/llvm/README.md`. Fixtures `llvm-in-peek` (each case below,
+      the 0X byte included, and `Peek` before `Int`) and
+      `vax-in-peek` (the same program, a `y` for the 0X byte, which a
+      VMS text record sent by FTP cannot be counted on to keep).
 
         PROCEDURE Peek*(VAR ch: CHAR);
         BEGIN
