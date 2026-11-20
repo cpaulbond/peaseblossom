@@ -433,6 +433,27 @@ macOS builds Stage 0 (`VOC_BIN_DIR` its `bin`, `VOC_LIB_DIR` the real
 `lib` directory when `bin/voc` is a symbolic link). It has not been a
 gate host.
 
+**arm64.** Two of these hosts are arm64, besides the Mac, and they check
+it differently:
+
+- rackhir (FreeBSD 15.1, emulated, so slow) is the only arm64 host that
+  runs the test suite, `gmake check-stage1`, on commits already pushed
+  (`tools/check-hosts -c HEAD rackhir`): after a change where the
+  architecture matters (calls, arithmetic, memory layout, the runtime's
+  C calls, the collector) and at each phase's close. What it finds is
+  fixed in a later commit. It also builds the FreeBSD arm64 package.
+- sadric (Raspberry Pi OS, which is Debian 13 trixie, on a Raspberry Pi
+  400) builds the Debian arm64 package, from 0.12.0 on (about 22
+  minutes). That build runs `test/install/check.sh` against the installed
+  poc (section 6), which is less than `make check`: arm64 Linux has had
+  no full run of the suite.
+
+No other arm64 system is recorded: not OpenBSD or NetBSD on arm64, and not
+Fedora on aarch64, whose RPM is `x86_64` only until poc has run on
+aarch64 Linux (`doc/history/phases/phase-13.md`). A new arm64 VM checks
+the most as FreeBSD 15.1, rackhir's system; one running Debian 13 arm64
+would add the first full suite on arm64 Linux.
+
 ### With other machines
 
 None of this needs those particular machines. What matters is that a
