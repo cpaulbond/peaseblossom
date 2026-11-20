@@ -145,6 +145,7 @@ test/conformance/vax-traps/vax-traps
 test/conformance/vax-var-records/vax-var-records
 test/conformance/llvm-in/llvm-in
 test/conformance/llvm-in-extra/llvm-in-extra
+test/conformance/llvm-in-peek/llvm-in-peek
 test/conformance/llvm-strings/llvm-strings
 test/conformance/llvm-strings-extra/llvm-strings-extra
 test/conformance/llvm-math/llvm-math

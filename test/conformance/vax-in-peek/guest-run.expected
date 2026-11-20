@@ -1,0 +1,22 @@
+build status: %X10000001
+Peek 97 done
+Peek again 97 done
+Char 97 done
+Peek 98 done
+Char 98 done
+Peek at the line end 10 done
+Char 10 done
+Peek before Line 32 done
+Line [  second line] done
+Peek 121 done
+Char 121 done
+Peek 122 done
+Line [z] done
+Peek before Int 32 done
+Int 42 done
+Line [] done
+Line [last] done
+Peek at the end 0 not done
+Peek again 0 not done
+Char 0 not done
+run status: %X00000001
