@@ -6350,6 +6350,30 @@ MODULE LLVMCodeGenerator;
     RETURN FALSE
   END GenerateFoldedInteger;
 
+  (* A selection from a structured constant whose selectors are all
+     constant - squares[2], M.origin.x - is a constant (Oberon2.pdf §8,
+     doc/developer/record-and-array-literals.md), which ConstantEvaluator
+     folds: result is that value, as the VAX back end's Expression gives
+     it, rather than a load from the module's copy of the constant behind
+     index checks (PLAN.md, "Ongoing bug fixing", 32). TRUE when result
+     has been filled in; FALSE for anything else, and for a selection that
+     is itself a record or an array (identity[1]), which keeps its address
+     in the copy. *)
+  PROCEDURE GenerateFoldedSelection(VAR w: Files.Rider; VAR cg: Codegen; expr: SyntaxTree.DesignatorExprNode;
+                                    VAR result: Value): BOOLEAN;
+    VAR folded: Types.Value;
+  BEGIN
+    IF (expr.designator.selectors # NIL) & ConstantEvaluator.IsConstantExpr(expr, cg.scope) THEN
+      folded := ConstantEvaluator.Evaluate(expr, cg.scope);
+      IF (folded.type # Types.Undefined) & (folded.kind # Types.structuredValue)
+         & ~(folded.type IS Types.RecordType) & ~(folded.type IS Types.ArrayType) THEN
+        EmitConstantValue(w, cg, folded.type, folded, result);
+        RETURN TRUE
+      END
+    END;
+    RETURN FALSE
+  END GenerateFoldedSelection;
+
   PROCEDURE GenerateExpr(VAR w: Files.Rider; VAR cg: Codegen; expr: SyntaxTree.ExprNode; VAR result: Value);
   BEGIN
     IF expr.line > 0 THEN cg.currentLine := expr.line; cg.currentColumn := expr.column END;
@@ -6364,7 +6388,7 @@ MODULE LLVMCodeGenerator;
                & GenerateFoldedInteger(w, cg, expr, result)) THEN
             GenerateCall(w, cg, expr.designator, expr.args, result)
           END
-        ELSE
+        ELSIF ~GenerateFoldedSelection(w, cg, expr, result) THEN
           GenerateDesignatorValue(w, cg, expr.designator, result)
         END
     | expr: SyntaxTree.UnaryExprNode DO

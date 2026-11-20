@@ -1767,7 +1767,7 @@ Those fixed while Phase 18 was current, 8-10, are in
       under `-O2` and `-OC`; `vax-macro32-backend.md` says so.
 
 32. **The LLVM back end does not fold a selector on a structured constant
-    in a statement**.
+    in a statement** [fixed].
     Found 2026-11-19, with 0.14.0 (a410135) on x86_64, testing
     re-exported structured constants ("Ongoing implementation
     enhancements", 14). `squares[2]`, with `CONST squares = Squares{0,
@@ -1811,6 +1811,16 @@ Those fixed while Phase 18 was current, 8-10, are in
       two-dimensional index, with the IR showing no `-const.` global and
       no index check; the VAX fixture `vax-structured-constant-index`
       already covers a variable index there.
+    - Fixed (2026-11-19): `GenerateFoldedSelection`, called from
+      `GenerateExpr`'s designator branch, emits such a selection with
+      `EmitConstantValue` when `IsConstantExpr` says it is constant and
+      its value is neither a record nor an array. Fixture
+      `llvm-structured-constant-selection` (a local, an imported and a
+      re-exported constant; a field of each basic type; one- and
+      two-dimensional indexes) checks the values and that the folding
+      procedure's IR has no `-const.` global and no index check, while
+      a whole row, a whole field array and a variable index still use
+      the copy.
 
 ## Ongoing library enhancements
 
