@@ -18,10 +18,10 @@
 # archive still gets -flto, the link being shared or not. A -g copy, with a
 # manifest of its own, takes the option as the plain one does.
 unset POC_IMPORT_PATH
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 manifest() { grep -c '^no-shared$' "$1/$triple/O2/greet.library"; }
 files() {
-  ls "$1/$triple/O2" | grep '^libgreet' | sed 's/\.so\.0\.0$/.so/' | LC_ALL=C sort >>../result
+  ls "$1/$triple/O2" | grep '^libgreet' | sed -e 's/\.so\.0\.0$/.so/' -e 's/\.dylib$/.so/' | LC_ALL=C sort >>../result
 }
 rm -rf work && mkdir work && cd work || exit 1
 : >../result
@@ -76,9 +76,12 @@ echo "exit=$?" >>../result
 ./installed >>../result 2>&1
 echo "== -shared-libraries" >>../result
 # the shared libraries of ours the program asks for at run time
+# (on macOS the libraries it loads, otool -L, after its own name)
 needed() {
-  readelf -d "$1" | grep NEEDED | grep -E -o 'lib(greet|uses|poc-rtl)[^]]*' |
-    sed 's/\.so\.0\.0$/.so/' | LC_ALL=C sort >>../result
+  if [ "$(uname -s)" = Darwin ]
+  then otool -L "$1" | sed 1d | grep -E -o 'lib(greet|uses|poc-rtl)\.dylib'
+  else readelf -d "$1" | grep NEEDED | grep -E -o 'lib(greet|uses|poc-rtl)[^]]*'
+  fi | sed -e 's/\.so\.0\.0$/.so/' -e 's/\.dylib$/.so/' | LC_ALL=C sort >>../result
 }
 poc -library-path before -shared-libraries -o shared -build ../main.mod >>../result 2>&1
 echo "exit=$?" >>../result
@@ -113,7 +116,7 @@ echo "== -g" >>../result
 poc -g -output-dir debug -no-shared-library -library greet ../Greet.Mod >>../result 2>&1
 echo "exit=$?" >>../result
 grep -c '^no-shared$' "debug/$triple/O2-g/greet.library" >>../result
-ls "debug/$triple/O2-g" | grep '^libgreet' | sed 's/\.so\.0\.0$/.so/' | LC_ALL=C sort >>../result
+ls "debug/$triple/O2-g" | grep '^libgreet' | sed -e 's/\.so\.0\.0$/.so/' -e 's/\.dylib$/.so/' | LC_ALL=C sort >>../result
 poc -g -library-path debug -o debugged -build ../main.mod >>../result 2>&1
 echo "exit=$?" >>../result
 ./debugged >>../result 2>&1

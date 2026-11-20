@@ -5,8 +5,10 @@
 # rule); a pointer held only in a C frame of the suspended stack survives
 # collections; the rounding mode (x87 control word and MXCSR, FPCR) stays
 # with the coroutine that set it (decision 6).
+# The program is callbacks, not callback, whose files would be Callback's
+# where the file system ignores case (macOS).
 POC_IMPORT_PATH=../../../rtl/llvm:part
 export POC_IMPORT_PATH
-poc_build_run callback.mod
+poc_build_run callbacks.mod
 rm -f *.sym part/*.sym part/*.o part/*.ll
 . ../../testresult.sh

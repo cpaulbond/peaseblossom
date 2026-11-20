@@ -112,3 +112,18 @@ i686_triple() {
   else clang -m32 -dumpmachine
   fi
 }
+
+# The triple poc compiles for by default, and names a library's directory
+# by: clang -dumpmachine's, but on macOS the macosx one clang compiles for
+# (tools/host-triple, as LLVMToolchainDriver.HostTriple finds it).
+host_triple_tool=$PWD/../../../tools/host-triple
+host_triple() {
+  "$host_triple_tool"
+}
+
+# Whether voc is the reference implementation's release, 2.1.0, which a
+# fixture comparing its output with poc's was written against. Another
+# (5.3.0 changed Out.Hex) may not compile such a fixture's program.
+voc_is_reference() {
+  voc 2>/dev/null | head -1 | grep -q 'compiler v2\.1\.0 '
+}

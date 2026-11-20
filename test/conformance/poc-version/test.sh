@@ -9,7 +9,7 @@
 # version, or with no "poc" line (before 0.1.0), is refused, said once, and
 # the missing import's note points to it.
 exe=$(basename "$PWD")
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 mask() { sed -e "s|$triple|<triple>|g" -e "s/$number/<number>/g"; }
 : >result
 echo "== -version" >>result

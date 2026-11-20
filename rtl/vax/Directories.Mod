@@ -192,6 +192,14 @@ MODULE Directories;
     RETURN Fill(dir, length) & ODD(POC_PARSE(given, length))
   END IsDirectory;
 
+  (* Whether the directory of the file path names lists it spelled exactly
+     as in path, as rtl/llvm's: always, since a VMS file name has no case,
+     only the letters, and the file system finds it by those. *)
+  PROCEDURE SpelledAsGiven*(path: ARRAY OF CHAR): BOOLEAN;
+  BEGIN
+    RETURN TRUE
+  END SpelledAsGiven;
+
   (* Makes the directory dir and those it is in that are missing
      (LIB$CREATE_DIR); whether dir is a directory afterwards. *)
   PROCEDURE MakeDirectory*(dir: ARRAY OF CHAR): BOOLEAN;

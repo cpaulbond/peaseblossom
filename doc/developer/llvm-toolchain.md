@@ -99,8 +99,11 @@ shells out to these rather than linking against LLVM's own C++ API.
   the four systems it compiles for: flag and errno values, structure
   layouts, NetBSD's renamed functions. Such a file's own names should
   contain `-` (through `__asm__` labels, as `Platform.c`'s do:
-  `Platform.-open`), so that they never match a module's. Fixture
-  `llvm-c-part`.
+  `Platform.-open`), so that they never match a module's. Such a label
+  starts with `__USER_LABEL_PREFIX__`, through `Platform.c`'s `LABEL`
+  macro: macOS's Mach-O puts `_` before every name, the Oberon side's
+  references too, where ELF puts nothing. An ordinary C name needs no
+  label. Fixture `llvm-c-part`.
 - **Optimization level** (Phase 11 D13, 2026-09-26): `poc -opt <level>`
   makes `-build` pass clang `-O<level>`, one of `0`, `1`, `2`, `3`, `s`, `z`,
   `g` (not `-O<level>` itself: poc's `-O2`/`-OC` are voc's size-model flags).

@@ -107,7 +107,10 @@ ${CC:-cc} -fPIC -c "$ROOT/tools/bootstrap/voc-heap-gc-spill.c" -o voc-heap-gc-sp
 case $(uname -s) in Linux) spill_libs=-ldl ;; *) spill_libs= ;; esac
 LDFLAGS="$BUILD/obj/voc-heap-gc-spill.o $spill_libs${LDFLAGS:+ $LDFLAGS}" \
   voc -OC -m "$ROOT/src/driver/Poc.Mod"
-if ! nm Poc | grep -q ' T Heap_GC$'; then
+# Mach-O (macOS) puts "_" before C names. There libvoc calls its own
+# Heap_GC directly, so the spill reaches only poc's own calls; voc 5.3.0
+# for macOS needs none, since its Heap_MarkRoots saves x19-x28 itself.
+if ! nm Poc | grep -q ' T _\{0,1\}Heap_GC$'; then
   echo "stage0: poc was linked without voc-heap-gc-spill.o's Heap_GC" >&2
   exit 1
 fi

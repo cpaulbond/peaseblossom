@@ -135,10 +135,19 @@ MODULE LLVMToolchainDriver;
      reading that single line back. Cached after the first successful
      call - PLAN.md Phase 8 step 12's multi-module builds would otherwise
      re-shell out once per compiled module for no reason, since the host
-     triple cannot change mid-process. *)
+     triple cannot change mid-process.
+
+     On macOS, -dumpmachine's arm64-apple-darwin27.2.0 is not the triple
+     clang compiles for: that is arm64-apple-macosx<the deployment
+     target>, and clang warns ("overriding the module target triple")
+     about a .ll whose triple is any other. So there the triple is the
+     one the compiler proper (cc1) is given, from clang -###, read from
+     a file of its own: voc's Files, Stage 0's, gives the first file's old
+     contents when one of the same name is opened again. *)
   PROCEDURE HostTriple*(VAR triple: ARRAY OF CHAR): BOOLEAN;
     VAR
-      path, cmd: ARRAY 128 OF CHAR;
+      path, effective: ARRAY 128 OF CHAR;
+      cmd: ARRAY 256 OF CHAR;
       status, unlinkResult: INTEGER;
       ok: BOOLEAN;
   BEGIN
@@ -153,6 +162,14 @@ MODULE LLVMToolchainDriver;
     status := Platform.System(cmd);
     ok := ReadFirstLine(path, triple);
     unlinkResult := Platform.Unlink(path);
+    IF ok & LLVMTypes.IsDarwin(triple) THEN
+      Strcat(path, "-effective");
+      cmd := "clang -### -c -x c /dev/null 2>&1 | sed -n 's/.*-triple. .\([A-Za-z0-9_.-]*\).*/\1/p' >";
+      Strcat(cmd, path);
+      status := Platform.System(cmd);
+      IF ReadFirstLine(path, effective) & (effective[0] # 0X) THEN COPY(effective, triple) END;
+      unlinkResult := Platform.Unlink(path)
+    END;
     IF ok THEN
       COPY(triple, hostTripleCache);
       hostTripleCached := TRUE
@@ -538,14 +555,16 @@ MODULE LLVMToolchainDriver;
     RETURN TRUE
   END AppendLine;
 
-  (* Whether the object at path defines symbol (nm -P), read back from a
-     scratch file as HostTriple's is *)
-  PROCEDURE ObjectDefines(path, symbol: ARRAY OF CHAR): BOOLEAN;
+  (* Whether the object at path, compiled for triple, defines symbol (nm
+     -P), read back from a scratch file as HostTriple's is. On macOS nm
+     names it as Mach-O does, after a "_". *)
+  PROCEDURE ObjectDefines(path, symbol, triple: ARRAY OF CHAR): BOOLEAN;
     VAR
       scratch: ARRAY 128 OF CHAR; cmd: ARRAY 3 * pathBufferLength OF CHAR;
       quoted: ARRAY 2 * pathBufferLength OF CHAR; line: ARRAY 1024 OF CHAR;
-      f: Files.File; r: Files.Rider; i, status: INTEGER; found: BOOLEAN;
+      f: Files.File; r: Files.Rider; i, start, status: INTEGER; found: BOOLEAN;
   BEGIN
+    IF LLVMTypes.IsDarwin(triple) THEN start := 1 ELSE start := 0 END;
     IF ~QuoteWord(path, quoted) THEN RETURN FALSE END;
     scratch := "/tmp/poc-llvm-object-"; AppendInt(scratch, Platform.PID);
     cmd := "nm -P"; Strcat(cmd, quoted); Strcat(cmd, " >"); Strcat(cmd, scratch); Strcat(cmd, " 2>/dev/null");
@@ -557,9 +576,11 @@ MODULE LLVMToolchainDriver;
       REPEAT
         Files.ReadLine(r, line);
         i := 0;
-        WHILE (symbol[i] # 0X) & (line[i] = symbol[i]) DO INC(i) END;
-        (* the symbol, then a space and its type, defined: not U *)
-        IF (symbol[i] = 0X) & (line[i] = " ") & (line[i + 1] # "U") THEN found := TRUE END
+        IF (start = 0) OR (line[0] = "_") THEN
+          WHILE (symbol[i] # 0X) & (line[start + i] = symbol[i]) DO INC(i) END;
+          (* the symbol, then a space and its type, defined: not U *)
+          IF (symbol[i] = 0X) & (line[start + i] = " ") & (line[start + i + 1] # "U") THEN found := TRUE END
+        END
       UNTIL found OR r.eof;
       Files.Close(f)
     END;
@@ -662,7 +683,7 @@ MODULE LLVMToolchainDriver;
             stamped := AppendLine(ir, line)
           END
         END;
-        IF ~(stamped & ~rebuild & ObjectDefines(path, symbol)) THEN ok := RunCommand() END;
+        IF ~(stamped & ~rebuild & ObjectDefines(path, symbol, triple)) THEN ok := RunCommand() END;
         IF ~ok & (m.irPath[0] # 0X) THEN
           (* IR from a newer LLVM than this clang's does not parse *)
           Err.String("poc: clang cannot compile "); Err.String(m.irPath);
@@ -721,6 +742,15 @@ MODULE LLVMToolchainDriver;
     IF LLVMTypes.IsNetBSD(triple) THEN Strcat(command, " -Wl,-z,relro") END
   END AppendHardeningOptions;
 
+  (* On macOS: a module with a pointer among its variables refers to
+     ModuleTable.Register weakly (LLVMCodeGenerator), which an ELF linker
+     leaves null when nothing defines it, and ld64 refuses unless told it
+     may stay undefined (-U, Mach-O's name); then dyld binds it to null *)
+  PROCEDURE AppendWeakReferenceOptions(triple: ARRAY OF CHAR);
+  BEGIN
+    IF LLVMTypes.IsDarwin(triple) THEN Strcat(command, " -Wl,-U,_ModuleTable.Register") END
+  END AppendWeakReferenceOptions;
+
   (* appends the object of each module that is not from a library: the
      one compiled, or the one given with its .sym; and its C part's
      (CompanionObject); then the object files of the command line *)
@@ -740,11 +770,16 @@ MODULE LLVMToolchainDriver;
 
   (* The file name of library name's shared library for triple:
      lib<name>.so, but lib<name>.so.0.0 on OpenBSD, whose linker finds
-     -l<name> only as lib<name>.so.<major>.<minor> *)
+     -l<name> only as lib<name>.so.<major>.<minor>, and lib<name>.dylib on
+     macOS *)
   PROCEDURE SharedLibraryName*(name, triple: ARRAY OF CHAR; VAR file: ARRAY OF CHAR);
   BEGIN
-    COPY("lib", file); Strcat(file, name); Strcat(file, ".so");
-    IF LLVMTypes.IsOpenBSD(triple) THEN Strcat(file, ".0.0") END
+    COPY("lib", file); Strcat(file, name);
+    IF LLVMTypes.IsDarwin(triple) THEN Strcat(file, ".dylib")
+    ELSE
+      Strcat(file, ".so");
+      IF LLVMTypes.IsOpenBSD(triple) THEN Strcat(file, ".0.0") END
+    END
   END SharedLibraryName;
 
   (* path made absolute (from the current directory) and without "." or
@@ -845,6 +880,15 @@ MODULE LLVMToolchainDriver;
     libraryArguments[0] := 0X; runDirectories := NIL; cxxLibrary := FALSE
   END ClearLibraries;
 
+  (* Whether a directory before d in the list of run directories is d's *)
+  PROCEDURE Repeated(d: RunDirectory): BOOLEAN;
+    VAR e: RunDirectory;
+  BEGIN
+    e := runDirectories;
+    WHILE (e # d) & (e.dir # d.dir) DO e := e.next END;
+    RETURN e # d
+  END Repeated;
+
   (* Phase 12 step 2e: the run-time search path of an executable or shared
      library written in the directory outputDir, for the shared libraries
      AddLibrary named: first each one's directory relative to outputDir's,
@@ -854,20 +898,31 @@ MODULE LLVMToolchainDriver;
      too (an installed library only absolutely: AddLibrary). A shared
      library (forLibrary) also has $ORIGIN itself first: the
      libraries it needs, installed beside it. -z origin marks the object as
-     using $ORIGIN, without which OpenBSD's ld.so does not expand it. *)
-  PROCEDURE AppendRunPath(outputDir: ARRAY OF CHAR; forLibrary: BOOLEAN);
+     using $ORIGIN, without which OpenBSD's ld.so does not expand it.
+     macOS's dyld has @loader_path for $ORIGIN and needs no mark; a
+     library there is found through these because it is named by its
+     install name, @rpath/lib<name>.dylib (BuildLibrary). ld64 warns of a
+     directory given twice (two libraries in one), so there each is given
+     once (Repeated). *)
+  PROCEDURE AppendRunPath(outputDir, triple: ARRAY OF CHAR; forLibrary: BOOLEAN);
     VAR
       from, rel: ARRAY pathBufferLength OF CHAR; path: ARRAY 2 * pathBufferLength OF CHAR;
-      quoted: ARRAY 4 * pathBufferLength OF CHAR; d: RunDirectory; ok: BOOLEAN;
+      quoted: ARRAY 4 * pathBufferLength OF CHAR; origin: ARRAY 16 OF CHAR; d: RunDirectory;
+      ok, once: BOOLEAN;
   BEGIN
     IF runDirectories = NIL THEN RETURN END;
     Normalize(outputDir, from);
-    Strcat(command, " -Wl,-z,origin");
-    IF forLibrary THEN Strcat(command, " '-Wl,-rpath,$ORIGIN'") END;
+    once := LLVMTypes.IsDarwin(triple);
+    IF once THEN origin := "@loader_path"
+    ELSE origin := "$ORIGIN"; Strcat(command, " -Wl,-z,origin")
+    END;
+    IF forLibrary THEN
+      COPY("-Wl,-rpath,", path); Strcat(path, origin); ok := QuoteWord(path, quoted); Strcat(command, quoted)
+    END;
     d := runDirectories;
     WHILE d # NIL DO
-      IF ~d.installed & RelativePath(from, d.dir, rel) & ((rel[0] # 0X) OR ~forLibrary) THEN
-        COPY("-Wl,-rpath,$ORIGIN", path);
+      IF ~d.installed & ~(once & Repeated(d)) & RelativePath(from, d.dir, rel) & ((rel[0] # 0X) OR ~forLibrary) THEN
+        COPY("-Wl,-rpath,", path); Strcat(path, origin);
         IF rel[0] # 0X THEN Strcat(path, "/"); Strcat(path, rel) END;
         ok := QuoteWord(path, quoted); Strcat(command, quoted)
       END;
@@ -875,7 +930,9 @@ MODULE LLVMToolchainDriver;
     END;
     d := runDirectories;
     WHILE d # NIL DO
-      COPY("-Wl,-rpath,", path); Strcat(path, d.dir); ok := QuoteWord(path, quoted); Strcat(command, quoted);
+      IF ~(once & Repeated(d)) THEN
+        COPY("-Wl,-rpath,", path); Strcat(path, d.dir); ok := QuoteWord(path, quoted); Strcat(command, quoted)
+      END;
       d := d.next
     END
   END AppendRunPath;
@@ -889,7 +946,7 @@ MODULE LLVMToolchainDriver;
      (doc/developer/static-only-libraries.md). A failure of that link sets
      sharedLinkFailed. *)
   PROCEDURE BuildLibrary*(modules: ModuleLists.ModuleList; name, triple, dir: ARRAY OF CHAR; shared: BOOLEAN): BOOLEAN;
-    VAR path, file: ARRAY pathBufferLength OF CHAR; linker: ARRAY 8 OF CHAR; deleteResult: INTEGER;
+    VAR path, file, install: ARRAY pathBufferLength OF CHAR; linker: ARRAY 8 OF CHAR; deleteResult: INTEGER;
   BEGIN
     sharedLinkFailed := FALSE;
     IF ~EmitIR(modules, name, triple, dir, path) THEN RETURN FALSE END;
@@ -907,11 +964,17 @@ MODULE LLVMToolchainDriver;
     END;
     Linker(modules, dir, linker);
     COPY(linker, command); Strcat(command, " -shared"); AppendTargetOptions(command, triple);
-    AppendLTOOptions(triple); AppendHardeningOptions(triple);
+    AppendLTOOptions(triple); AppendHardeningOptions(triple); AppendWeakReferenceOptions(triple);
+    IF LLVMTypes.IsDarwin(triple) THEN
+      (* the name a program linked with it records, for dyld to look up on
+         the program's run-time search path (AppendRunPath) *)
+      COPY(file, install); COPY("-Wl,-install_name,@rpath/", file); Strcat(file, install);
+      AppendPath(file)
+    END;
     AppendObjects(modules, dir);
     Strcat(command, " -o"); AppendPath(path);
     Strcat(command, libraryArguments);
-    AppendRunPath(dir, TRUE);
+    AppendRunPath(dir, triple, TRUE);
     Strcat(command, linkArguments);
     Strcat(command, " -lm");
     sharedLinkFailed := ~RunCommand();
@@ -936,11 +999,15 @@ MODULE LLVMToolchainDriver;
                    triple, outputDir, exePath: ARRAY OF CHAR): BOOLEAN;
     VAR path, exeDir: ARRAY pathBufferLength OF CHAR; linker: ARRAY 8 OF CHAR; i, slash: INTEGER;
   BEGIN
+    IF staticLink & LLVMTypes.IsDarwin(triple) THEN
+      Err.String("poc: -static cannot link for macOS, which has no static C library"); Err.Ln;
+      RETURN FALSE
+    END;
     IF ~EmitIR(modules, topName, triple, outputDir, path) THEN RETURN FALSE END;
     IF ~CompileModules(modules, triple, outputDir, TRUE) THEN RETURN FALSE END;
     Linker(modules, outputDir, linker);
     COPY(linker, command); AppendTargetOptions(command, triple);
-    AppendLTOOptions(triple); AppendHardeningOptions(triple);
+    AppendLTOOptions(triple); AppendHardeningOptions(triple); AppendWeakReferenceOptions(triple);
     AppendObjects(modules, outputDir);
     Strcat(command, " -o"); AppendPath(exePath);
     Strcat(command, libraryArguments);
@@ -951,7 +1018,7 @@ MODULE LLVMToolchainDriver;
     ELSIF slash = 0 THEN exeDir := "/"
     ELSE COPY(exePath, exeDir); exeDir[slash] := 0X
     END;
-    AppendRunPath(exeDir, FALSE);
+    AppendRunPath(exeDir, triple, FALSE);
     Strcat(command, linkArguments);
     (* libm, for rtl/llvm's Math and MathL: on every supported system it is
        a library apart from libc, and -lm links nothing that is not used *)

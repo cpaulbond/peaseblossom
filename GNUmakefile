@@ -43,7 +43,7 @@ VAX_IMAGE_BIN := $(BUILD_DIR)/bin/vax-image
 # Phase 12 step 2d: rtl/llvm as the library poc-rtl, for this host's triple
 # and both size models, where each poc's default library path finds it
 # (<its bin>/../lib/poc): so a program links the runtime already compiled.
-HOST_TRIPLE := $(shell clang -dumpmachine)
+HOST_TRIPLE := $(shell tools/host-triple)
 RTL_LIBRARIES = $(1)/lib/poc/$(HOST_TRIPLE)/O2/poc-rtl.library $(1)/lib/poc/$(HOST_TRIPLE)/OC/poc-rtl.library
 # The Stage 0 poc is a voc program, linked against voc's shared runtime,
 # which only Linux finds by itself (as in tools/bootstrap/stage1 and

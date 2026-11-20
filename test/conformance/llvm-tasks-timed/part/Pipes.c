@@ -5,7 +5,13 @@
 #include <stdint.h>
 #include <unistd.h>
 
-#define NAME(n) __asm__("Pipes.-" n)
+/* A name as the linker sees it: Mach-O (macOS) puts "_" before every C
+   name (__USER_LABEL_PREFIX__), which the Oberon side's references get
+   too; ELF puts nothing. As rtl/llvm/Platform.c's. */
+#define LABEL_PREFIX_TEXT(p) #p
+#define LABEL_PREFIX(p) LABEL_PREFIX_TEXT(p)
+#define LABEL(n) LABEL_PREFIX(__USER_LABEL_PREFIX__) n
+#define NAME(n) __asm__(LABEL("Pipes.-" n))
 
 static void nonblocking(int fd)
 {

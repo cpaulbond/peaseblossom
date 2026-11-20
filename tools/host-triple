@@ -1,0 +1,15 @@
+#!/bin/sh
+# Prints the target triple poc compiles for by default, as LLVMToolchainDriver.
+# HostTriple finds it: clang -dumpmachine's, except on macOS, where clang
+# compiles for arm64-apple-macosx<the deployment target>, not -dumpmachine's
+# arm64-apple-darwin<the kernel version>, and that is the triple the compiler
+# proper (cc1) is given. The GNUmakefile names the directories of the
+# libraries it builds by it, as poc looks for them.
+triple=$(clang -dumpmachine) || exit 1
+case $triple in
+  *-apple-darwin*)
+    effective=$(clang -### -c -x c /dev/null 2>&1 |
+      sed -n 's/.*-triple. .\([A-Za-z0-9_.-]*\).*/\1/p')
+    [ -n "$effective" ] && triple=$effective ;;
+esac
+echo "$triple"

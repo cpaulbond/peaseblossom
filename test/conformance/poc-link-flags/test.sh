@@ -9,7 +9,9 @@
 # optimization level replaced: a clang -c for each module, then the link
 # (-clear-library-path: rtl/llvm compiled too, not taken from poc-rtl).
 # NetBSD's -Wl,-z,relro (llvm-relro) is left out, so that every host gives
-# the same command.
+# the same command. macOS links nothing -static: there -static is refused,
+# the -verbose link is the dynamic one, its interpreter is dyld
+# (LC_LOAD_DYLINKER), and the result is compared with expected-macos.
 POC_IMPORT_PATH=../../../rtl/llvm
 export POC_IMPORT_PATH
 exe=$(basename "$PWD")
@@ -20,17 +22,35 @@ ranlib "lib dir/libpocfixture.a"
 : >result
 echo "== without -link" >>result
 poc -o "$exe" -build linkflags.mod 2>&1 | grep '^poc:' >>result
-echo "== -link, -static and -verbose" >>result
-poc -clear-library-path -verbose -static -link "-Llib dir" -link -lpocfixture -o "$exe" -build linkflags.mod 2>&1 \
-  | grep -v '^semantic OK' | sed -e 's/--target=[^ ]*/--target=<triple>/' -e 's/ -O[0-9sgz]/ -O<level>/' -e 's/ -Wl,-z,relro//' >>result
+# the program interpreter's program headers: 1 when it has one, 0 when not
+interpreter() {
+  if [ "$(uname -s)" = Darwin ]
+  then otool -l "$1" | grep -c LC_LOAD_DYLINKER
+  else readelf -l "$1" | grep -c INTERP
+  fi
+}
+verbose() {
+  grep -v '^semantic OK' | sed -e 's/--target=[^ ]*/--target=<triple>/' -e 's/ -O[0-9sgz]/ -O<level>/' -e 's/ -Wl,-z,relro//'
+}
+if [ "$(uname -s)" = Darwin ]; then
+  expected_file=expected-macos
+  echo "== -static" >>result
+  poc -clear-library-path -static -link "-Llib dir" -link -lpocfixture -o "$exe" -build linkflags.mod >>result 2>&1
+  printf 'exit=%d\n' "$?" >>result
+  echo "== -link and -verbose" >>result
+  poc -clear-library-path -verbose -link "-Llib dir" -link -lpocfixture -o "$exe" -build linkflags.mod 2>&1 | verbose >>result
+else
+  echo "== -link, -static and -verbose" >>result
+  poc -clear-library-path -verbose -static -link "-Llib dir" -link -lpocfixture -o "$exe" -build linkflags.mod 2>&1 | verbose >>result
+fi
 "./$exe" >>result 2>&1
 printf 'exit=%d\n' "$?" >>result
-printf 'INTERP: %s\n' "$(readelf -l "$exe" | grep -c INTERP)" >>result
+printf 'INTERP: %s\n' "$(interpreter "$exe")" >>result
 echo "== -link, dynamic" >>result
 poc -link "-Llib dir" -link -lpocfixture -o "$exe" -build linkflags.mod 2>&1 | grep -v '^semantic OK' >>result
 "./$exe" >>result 2>&1
 printf 'exit=%d\n' "$?" >>result
-printf 'INTERP: %s\n' "$(readelf -l "$exe" | grep -c INTERP)" >>result
+printf 'INTERP: %s\n' "$(interpreter "$exe")" >>result
 echo "== -link without an argument" >>result
 poc -link >>result 2>&1
 printf 'exit=%d\n' "$?" >>result

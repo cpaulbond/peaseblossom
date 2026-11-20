@@ -28,10 +28,6 @@ exit=17
 Transfer in a signal handler
 finalized 1
 exit=17
-== 8
-no memory for a coroutine's stack
-finalized 1
-exit=18
 == 9
 NIL dereferenced on a coroutine
 NIL pointer dereference

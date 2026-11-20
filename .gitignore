@@ -28,6 +28,8 @@ test/conformance/**/*.h
 !test/conformance/llvm-object-reuse/src/a.h
 test/conformance/**/*.sym
 test/conformance/**/*.o
+# a program's debug information on macOS, which voc's link leaves beside it
+test/conformance/**/*.dSYM/
 # a C or C++ part's dependencies and stamp (poc's clang -MD)
 test/conformance/**/*.o.d
 test/conformance/**/*.ll

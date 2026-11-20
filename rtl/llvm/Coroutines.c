@@ -27,10 +27,26 @@
 #include <sys/mman.h>
 #include "valgrind.h"
 
-#define NAME(n) __asm__("Coroutines.-" n)
+/* A name as the linker sees it: Mach-O (macOS) puts "_" before every C
+   name (__USER_LABEL_PREFIX__), which the Oberon side's references get
+   too; ELF puts nothing. */
+#define LABEL_PREFIX_TEXT(p) #p
+#define LABEL_PREFIX(p) LABEL_PREFIX_TEXT(p)
+#define LABEL(n) LABEL_PREFIX(__USER_LABEL_PREFIX__) n
+#define NAME(n) __asm__(LABEL("Coroutines.-" n))
+
+/* The assembly's symbol type and size directives, which ELF has and
+   Mach-O does not. */
+#if defined(__APPLE__)
+#define ASM_TYPE(n, kind) ""
+#define ASM_SIZE(n) ""
+#else
+#define ASM_TYPE(n, kind) "  .type \"" LABEL(n) "\"," kind "\n"
+#define ASM_SIZE(n) "  .size \"" LABEL(n) "\", .-\"" LABEL(n) "\"\n"
+#endif
 
 /* Platform.c's count of signal handlers running (decision 7). */
-extern volatile int32_t PlatformHandlersRunning __asm__("Platform.-handlers-running");
+extern volatile int32_t PlatformHandlersRunning __asm__(LABEL("Platform.-handlers-running"));
 
 static void trap(const char *message, int status)
 {
@@ -42,7 +58,8 @@ static void trap(const char *message, int status)
    body (trap 4, as a call of a NIL procedure value is). Static, so that
    the trampoline's calls need no PLT in the shared library, and with
    C's own names: -lto lists such a function in a .lto_discard directive,
-   where clang 19 and 21 reject a name with a "-" in it. */
+   where clang 19 and 21 reject a name with a "-" in it. The assembly
+   calls them by LABEL, since Mach-O puts "_" before a static name too. */
 static void coroutines_body_returned(void) __attribute__((used));
 static void coroutines_body_returned(void) { trap("coroutine body returned\n", 16); }
 static void coroutines_nil_body(void) __attribute__((used));
@@ -75,28 +92,28 @@ int32_t CoroutinesInSignalHandler(void) { return PlatformHandlersRunning > 0; }
    r15, r14, r13, r12, rbx, rbp, the return address. */
 __asm__(
   "  .text\n"
-  "  .globl \"Coroutines.-switch\"\n"
-  "  .type \"Coroutines.-switch\",@function\n"
-  "\"Coroutines.-switch\":\n"
+  "  .globl \"" LABEL("Coroutines.-switch") "\"\n"
+  ASM_TYPE("Coroutines.-switch", "@function")
+  "\"" LABEL("Coroutines.-switch") "\":\n"
   "  pushq %rbp\n  pushq %rbx\n  pushq %r12\n  pushq %r13\n  pushq %r14\n  pushq %r15\n"
   "  subq $8, %rsp\n  stmxcsr (%rsp)\n  fnstcw 4(%rsp)\n"
   "  movq %rsp, (%rdi)\n  movq %rsi, %rsp\n"
   "  ldmxcsr (%rsp)\n  fldcw 4(%rsp)\n  addq $8, %rsp\n"
   "  popq %r15\n  popq %r14\n  popq %r13\n  popq %r12\n  popq %rbx\n  popq %rbp\n"
   "  ret\n"
-  "  .size \"Coroutines.-switch\", .-\"Coroutines.-switch\"\n"
+  ASM_SIZE("Coroutines.-switch")
   /* entered by the switch's ret with the body in r12 and rsp 8 below a
      16-byte boundary */
-  "  .type \"Coroutines.-start\",@function\n"
-  "\"Coroutines.-start\":\n"
+  ASM_TYPE("Coroutines.-start", "@function")
+  "\"" LABEL("Coroutines.-start") "\":\n"
   "  .cfi_startproc\n  .cfi_undefined rip\n"
   "  subq $8, %rsp\n  xorl %ebp, %ebp\n"
   "  testq %r12, %r12\n  jz 1f\n"
   "  callq *%r12\n"
-  "  callq coroutines_body_returned\n"
-  "1:  callq coroutines_nil_body\n  ud2\n"
+  "  callq " LABEL("coroutines_body_returned") "\n"
+  "1:  callq " LABEL("coroutines_nil_body") "\n  ud2\n"
   "  .cfi_endproc\n"
-  "  .size \"Coroutines.-start\", .-\"Coroutines.-start\"\n");
+  ASM_SIZE("Coroutines.-start"));
 #define FRAME_WORDS 9
 static void first_frame(uintptr_t *top, uintptr_t body, uintptr_t start)
 {
@@ -113,9 +130,9 @@ static void first_frame(uintptr_t *top, uintptr_t body, uintptr_t start)
    address. */
 __asm__(
   "  .text\n"
-  "  .globl \"Coroutines.-switch\"\n"
-  "  .type \"Coroutines.-switch\",@function\n"
-  "\"Coroutines.-switch\":\n"
+  "  .globl \"" LABEL("Coroutines.-switch") "\"\n"
+  ASM_TYPE("Coroutines.-switch", "@function")
+  "\"" LABEL("Coroutines.-switch") "\":\n"
   "  movl 4(%esp), %eax\n  movl 8(%esp), %edx\n"
   "  pushl %ebp\n  pushl %ebx\n  pushl %esi\n  pushl %edi\n"
   "  subl $4, %esp\n  fnstcw (%esp)\n"
@@ -123,19 +140,19 @@ __asm__(
   "  fldcw (%esp)\n  addl $4, %esp\n"
   "  popl %edi\n  popl %esi\n  popl %ebx\n  popl %ebp\n"
   "  ret\n"
-  "  .size \"Coroutines.-switch\", .-\"Coroutines.-switch\"\n"
+  ASM_SIZE("Coroutines.-switch")
   /* entered by the switch's ret with the body in ebx and esp 4 below a
      16-byte boundary */
-  "  .type \"Coroutines.-start\",@function\n"
-  "\"Coroutines.-start\":\n"
+  ASM_TYPE("Coroutines.-start", "@function")
+  "\"" LABEL("Coroutines.-start") "\":\n"
   "  .cfi_startproc\n  .cfi_undefined eip\n"
   "  subl $12, %esp\n  xorl %ebp, %ebp\n"
   "  testl %ebx, %ebx\n  jz 1f\n"
   "  call *%ebx\n"
-  "  call coroutines_body_returned\n"
-  "1:  call coroutines_nil_body\n  ud2\n"
+  "  call " LABEL("coroutines_body_returned") "\n"
+  "1:  call " LABEL("coroutines_nil_body") "\n  ud2\n"
   "  .cfi_endproc\n"
-  "  .size \"Coroutines.-start\", .-\"Coroutines.-start\"\n");
+  ASM_SIZE("Coroutines.-start"));
 #define FRAME_WORDS 7
 static void first_frame(uintptr_t *top, uintptr_t body, uintptr_t start)
 {
@@ -149,9 +166,9 @@ static void first_frame(uintptr_t *top, uintptr_t body, uintptr_t start)
    x29 and x30 (the return address), d8-d15, FPCR, padding. */
 __asm__(
   "  .text\n"
-  "  .globl \"Coroutines.-switch\"\n"
-  "  .type \"Coroutines.-switch\",%function\n"
-  "\"Coroutines.-switch\":\n"
+  "  .globl \"" LABEL("Coroutines.-switch") "\"\n"
+  ASM_TYPE("Coroutines.-switch", "%function")
+  "\"" LABEL("Coroutines.-switch") "\":\n"
   "  sub sp, sp, #176\n"
   "  stp x19, x20, [sp, #0]\n  stp x21, x22, [sp, #16]\n  stp x23, x24, [sp, #32]\n"
   "  stp x25, x26, [sp, #48]\n  stp x27, x28, [sp, #64]\n  stp x29, x30, [sp, #80]\n"
@@ -166,18 +183,18 @@ __asm__(
   "  ldp d12, d13, [sp, #128]\n  ldp d14, d15, [sp, #144]\n"
   "  add sp, sp, #176\n"
   "  ret\n"
-  "  .size \"Coroutines.-switch\", .-\"Coroutines.-switch\"\n"
+  ASM_SIZE("Coroutines.-switch")
   /* entered by the switch's ret with the body in x19 and sp at the top */
-  "  .type \"Coroutines.-start\",%function\n"
-  "\"Coroutines.-start\":\n"
+  ASM_TYPE("Coroutines.-start", "%function")
+  "\"" LABEL("Coroutines.-start") "\":\n"
   "  .cfi_startproc\n  .cfi_undefined x30\n"
   "  mov x29, #0\n"
   "  cbz x19, 1f\n"
   "  blr x19\n"
-  "  bl coroutines_body_returned\n"
-  "1:  bl coroutines_nil_body\n  brk #0\n"
+  "  bl " LABEL("coroutines_body_returned") "\n"
+  "1:  bl " LABEL("coroutines_nil_body") "\n  brk #0\n"
   "  .cfi_endproc\n"
-  "  .size \"Coroutines.-start\", .-\"Coroutines.-start\"\n");
+  ASM_SIZE("Coroutines.-start"));
 #define FRAME_WORDS 22
 static void first_frame(uintptr_t *top, uintptr_t body, uintptr_t start)
 {
@@ -191,7 +208,7 @@ static void first_frame(uintptr_t *top, uintptr_t body, uintptr_t start)
 #error "Coroutines.c: no context switch for this architecture"
 #endif
 
-extern char coroutines_start[] __asm__("Coroutines.-start") __attribute__((visibility("hidden")));
+extern char coroutines_start[] __asm__(LABEL("Coroutines.-start")) __attribute__((visibility("hidden")));
 
 /* A stack of size bytes, rounded up to whole pages, above a guard page
    that is not counted, holding a first frame that calls body: its bounds

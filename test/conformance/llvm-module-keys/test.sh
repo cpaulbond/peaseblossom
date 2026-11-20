@@ -38,8 +38,9 @@ relink() {
     ./relinked >>../result
   else
     echo "link: failed" >>../result
-    # GNU ld and lld word it differently; both name the symbol
-    if grep -q "undefined.*lib\.-key\.O2\.$lib1" link.err
+    # GNU ld and lld word it differently; both name the symbol. macOS's
+    # ld64 names it, after its "_", on a line below "Undefined symbols".
+    if grep -q -e "undefined.*lib\.-key\.O2\.$lib1" -e "\"_lib\.-key\.O2\.$lib1\"" link.err
     then echo "the linker names lib.-key.<the hash client.o was compiled against> undefined" >>../result
     else cat link.err >>../result
     fi

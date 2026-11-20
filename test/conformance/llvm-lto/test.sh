@@ -17,7 +17,7 @@
 #      whose clang targets 32-bit x86 NetBSD itself (yishana).
 # The triple, keys and poc's library directory are masked.
 unset POC_IMPORT_PATH POC_LIBRARY_PATH
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 pocLib=$(poc -print-library-path | tail -n 1)
 mask() {
   sed -e "s|$pocLib|<poc lib>|g" -e "s|$triple|<triple>|g" -e 's/[0-9a-f]\{16\}/<key>/g'

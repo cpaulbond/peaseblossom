@@ -410,6 +410,15 @@ MODULE LLVMTypes;
     RETURN (arch = "i386") OR (arch = "i486") OR (arch = "i586") OR (arch = "i686") OR (arch = "x86")
   END Is32BitX86;
 
+  (* Whether triple's operating system is macOS: "darwin" (clang
+     -dumpmachine's) or "macos"/"macosx" (the triple clang compiles for),
+     the third component, or the second when the vendor is left out *)
+  PROCEDURE IsDarwin*(triple: ARRAY OF CHAR): BOOLEAN;
+  BEGIN
+    RETURN TripleComponentStartsWith(triple, 1, "darwin") OR TripleComponentStartsWith(triple, 2, "darwin")
+        OR TripleComponentStartsWith(triple, 1, "macos") OR TripleComponentStartsWith(triple, 2, "macos")
+  END IsDarwin;
+
   (* The target datalayout of triple, as clang gives it, in layout; FALSE,
      layout empty, for an architecture poc has not been run on, whose .ll
      then has no datalayout line and takes clang's for the target. x86_64
@@ -418,14 +427,22 @@ MODULE LLVMTypes;
      address spaces, and clang takes its own over a module's anyway, so
      the string is for what reads the .ll (llc, opt, a person), not for
      the build. Until Phase 13 step 4's seed work found it, aarch64 got
-     x86_64's: the choice was by word size alone. *)
+     x86_64's: the choice was by word size alone. macOS (IsDarwin) has
+     Mach-O's mangling, "m:o", which puts "_" before every name, as Apple's
+     clang 21 gives it for arm64 and x86_64. *)
   PROCEDURE DataLayout*(triple: ARRAY OF CHAR; VAR layout: ARRAY OF CHAR): BOOLEAN;
     VAR arch: ARRAY 32 OF CHAR; i: INTEGER;
   BEGIN
     i := 0;
     WHILE (triple[i] # 0X) & (triple[i] # "-") & (i < 31) DO arch[i] := triple[i]; INC(i) END;
     arch[i] := 0X;
-    IF (arch = "x86_64") OR (arch = "amd64") THEN
+    IF IsDarwin(triple) & ((arch = "arm64") OR (arch = "aarch64")) THEN
+      COPY("e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-n32:64-S128-Fn32", layout)
+    ELSIF IsDarwin(triple) & (arch = "x86_64") THEN
+      COPY("e-m:o-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", layout)
+    ELSIF IsDarwin(triple) THEN
+      layout[0] := 0X
+    ELSIF (arch = "x86_64") OR (arch = "amd64") THEN
       COPY("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-i128:128-f80:128-n8:16:32:64-S128", layout)
     ELSIF Is32BitX86(triple) THEN
       COPY("e-m:e-p:32:32-p270:32:32-p271:32:32-p272:64:64-i128:128-f64:32:64-f80:32-n8:16:32-S128", layout)

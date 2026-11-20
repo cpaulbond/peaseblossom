@@ -382,12 +382,16 @@ MODULE Libraries;
     ModelDirectory(base, debug, dir)
   END TupleDirectory;
 
-  (* The owner of name in the tuple directory dir, from <Module>.owner *)
+  (* The owner of name in the tuple directory dir, from <Module>.owner,
+     spelled as name is: where the file system ignores case (macOS),
+     Tasks.owner is no owner of a module tasks (Directories.SpelledAsGiven,
+     as ModuleInterface.OpenExact) *)
   PROCEDURE ReadOwner(dir, name: ARRAY OF CHAR; VAR owner: ARRAY OF CHAR): BOOLEAN;
     VAR path: Path; f: Files.File; r: Files.Rider;
   BEGIN
     Directories.MakePath(dir, name, path); Append(path, ".owner");
     f := Files.Old(path);
+    IF (f # NIL) & ~Directories.SpelledAsGiven(path) THEN Files.Close(f); f := NIL END;
     IF f # NIL THEN Files.Set(r, f, 0); Files.ReadLine(r, owner); Files.Close(f) END;
     RETURN f # NIL
   END ReadOwner;
@@ -876,13 +880,30 @@ MODULE Libraries;
     k.next := list; list := k
   END AddObjectKey;
 
+  (* Whether the object at path is Mach-O, macOS's (magic 0FEEDFACFH or,
+     32-bit, 0FEEDFACEH, little-endian), which names every symbol after a
+     "_" (nm too). Told from the file, not the target: an object for
+     another target is read to say which it was compiled for. *)
+  PROCEDURE IsMachO(path: ARRAY OF CHAR): BOOLEAN;
+    VAR f: Files.File; r: Files.Rider; b: ARRAY 4 OF CHAR; i: INTEGER;
+  BEGIN
+    f := Files.Old(path);
+    IF f = NIL THEN RETURN FALSE END;
+    Files.Set(r, f, 0);
+    FOR i := 0 TO 3 DO Files.Read(r, b[i]) END;
+    Files.Close(f);
+    RETURN ~r.eof & ((b[0] = 0CFX) OR (b[0] = 0CEX)) & (b[1] = 0FAX) & (b[2] = 0EDX) & (b[3] = 0FEX)
+  END IsMachO;
+
   (* What the object at path says of itself, in info. FALSE, having said
      why, when nm cannot read it. *)
   PROCEDURE ReadObject*(path: ARRAY OF CHAR; VAR info: ObjectInfo): BOOLEAN;
     VAR
       scratch: ARRAY 64 OF CHAR; command: ARRAY 2 * pathLength OF CHAR; line: ARRAY lineLength OF CHAR;
       w0, w1, w2, w3: Name; module, rest: Name; f: Files.File; r: Files.Rider; i, status: INTEGER;
+      machO: BOOLEAN;
   BEGIN
+    machO := IsMachO(path);
     info.defined := NIL; info.imports := NIL; info.targetModule[0] := 0X; info.target[0] := 0X;
     info.usesCollector := FALSE;
     i := 0;
@@ -904,6 +925,10 @@ MODULE Libraries;
     REPEAT
       Files.ReadLine(r, line);
       SplitLine(line, w0, w1, w2, w3);
+      IF machO & (w0[0] = "_") THEN
+        i := 0;
+        REPEAT w0[i] := w0[i + 1]; INC(i) UNTIL w0[i - 1] = 0X
+      END;
       IF w1 = "U" THEN
         IF SplitSymbol(w0, ".-key.", module, rest) THEN AddObjectKey(info.imports, module, rest)
         ELSIF SplitSymbol(w0, ".", module, rest) & (module = "GarbageCollectedHeap") THEN
@@ -1007,7 +1032,9 @@ MODULE Libraries;
     Files.Set(r, f, 0);
     FOR i := 0 TO 3 DO Files.Read(r, b[i]) END;
     Files.Close(f);
-    RETURN ~r.eof & (b[0] = "B") & (b[1] = "C") & (b[2] = 0C0X) & (b[3] = 0DEX)
+    (* bitcode, or on macOS bitcode in Apple's wrapper (magic 0B17C0DEH) *)
+    RETURN ~r.eof & (((b[0] = "B") & (b[1] = "C") & (b[2] = 0C0X) & (b[3] = 0DEX))
+                     OR ((b[0] = 0DEX) & (b[1] = 0C0X) & (b[2] = 17X) & (b[3] = 0BX)))
   END IsBitcode;
 
   (* ---- The libraries a program links ---- *)

@@ -19,6 +19,10 @@
 ;; - Phase 17 step 3 (2026-10-12): Platform has its whole interface
 ;;   (expected-vax-Platform.mar), so its interface key, the
 ;;   POC_K1_ symbol named here, is another; nothing else differs.
+;; - 2026-11-19 (the macOS port; not yet reviewed by the user, nor
+;;   assembled and run on the VAX): Directories has SpelledAsGiven
+;;   (expected-vax-Directories.mar), so its interface key, the POC_K1_
+;;   symbol named here, is another; nothing else differs.
 ; PlatformUse, written by poc (doc/developer/vax-macro32-backend.md)
 	.TITLE	PLATFORMUSE
 	.IDENT	/d0ecc0b98b085b09/
@@ -66,7 +70,7 @@ PLATFORMUSE_GONE_AR9RTE1Q:
 	.EXTERNAL	PLATFORM_INIT
 	.EXTERNAL	POC_K1_2A203935C54E257B
 	.EXTERNAL	DIRECTORIES_INIT
-	.EXTERNAL	POC_K1_989088C6901B9744
+	.EXTERNAL	POC_K1_BFA640D9548090F4
 
 ; its string constants
 	.PSECT	POC_CONST

@@ -8,7 +8,7 @@
 # directly, or through a library that needs it - then gets without naming
 # them. A module with both a C and a C++ part is refused.
 unset POC_IMPORT_PATH POC_LIBRARY_PATH
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 rm -rf work && mkdir work && cd work || exit 1
 here=$PWD
 mask() { sed -e "s|$triple|<triple>|g" -e "s|$here|<work>|g" -e 's/[0-9a-f]\{16\}/<key>/g'; }
@@ -32,7 +32,8 @@ cd ..
 echo "== a library, and its manifest's c++ and link lines" >>../result
 poc -output-dir lib -link -L"$here/native" -link -lnative -library greet ../part/Greet.Mod 2>&1 | mask >>../result
 grep -e '^c++' -e '^link' lib/$triple/O2/greet.library | mask >>../result
-ar t lib/$triple/O2/libgreet.a | LC_ALL=C sort >>../result
+# (macOS's ar lists its symbol table, __.SYMDEF SORTED, as a member)
+ar t lib/$triple/O2/libgreet.a | grep -v '^__\.SYMDEF' | LC_ALL=C sort >>../result
 poc -library-path lib -o fromlibrary -build ../usegreet.mod 2>&1 | mask >>../result
 ./fromlibrary >>../result
 poc -library-path lib -shared-libraries -o fromshared -build ../usegreet.mod 2>&1 | mask >>../result

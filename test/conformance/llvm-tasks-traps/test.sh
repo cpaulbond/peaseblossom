@@ -1,3 +1,8 @@
+# OpenBSD's ksh has no ulimit -v; there -d bounds anonymous mmap too. macOS
+# refuses both, and runs without a limit: there an impossible stack fails
+# anyway, but a leak only takes memory.
+  ulimit -v 1000000 2>/dev/null || ulimit -d 1000000 2>/dev/null ||
+    [ "$(uname -s)" = Darwin ] || ulimit -d 1000000
 #!/bin/sh
 . ../../testenv.sh
 # Tasks (doc/developer/tasks.md, Phase 9): trap 19 (all tasks blocked:
@@ -13,9 +18,12 @@
 # may post), so main awaiting alone is not a 19.
 POC_IMPORT_PATH=../../../rtl/llvm
 export POC_IMPORT_PATH
-# OpenBSD's ksh has no ulimit -v; there -d bounds anonymous mmap too.
+# OpenBSD's ksh has no ulimit -v; there -d bounds anonymous mmap too. macOS
+# refuses both and runs without a limit: there an impossible stack fails
+# anyway, but a leak only takes memory.
 limit_memory() {
-  ulimit -v 1000000 2>/dev/null || ulimit -d 1000000
+  ulimit -v 1000000 2>/dev/null || ulimit -d 1000000 2>/dev/null ||
+    [ "$(uname -s)" = Darwin ] || ulimit -d 1000000
 }
 poc -o traps.exe -build traps.mod >result 2>&1
 for which in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18

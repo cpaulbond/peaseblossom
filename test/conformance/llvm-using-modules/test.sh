@@ -31,7 +31,7 @@
 # has poc-rtl, and what each command adds. The triple, keys and that
 # directory are masked.
 unset POC_IMPORT_PATH POC_LIBRARY_PATH
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 pocLib=$(poc -print-library-path | tail -n 1)
 mask() {
   sed -e "s|$pocLib|<poc lib>|g" -e "s|$triple|<triple>|g" -e 's/[0-9a-f]\{16\}/<key>/g' \
@@ -85,7 +85,7 @@ echo "-- clib after alib" >>../result
 echo "== installing" >>../result
 poc -library-path liba -output-dir inst -install-library alib 2>&1 | mask >>../result
 poc -library-path libb -library-path liba -output-dir inst -install-library blib 2>&1 | mask >>../result
-ls inst/$triple/O2 | sed 's/\.so\.0\.0$/.so/' | LC_ALL=C sort >>../result
+ls inst/$triple/O2 | sed -e 's/\.so\.0\.0$/.so/' -e 's/\.dylib$/.so/' | LC_ALL=C sort >>../result
 echo "-- again" >>../result
 poc -library-path liba -output-dir inst -install-library alib 2>&1 | mask >>../result
 echo "-- over a copy another poc wrote, with a module it no longer has" >>../result

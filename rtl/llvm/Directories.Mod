@@ -29,6 +29,7 @@ MODULE Directories;
 
   PROCEDURE ["C", "Directories.-is-directory"] CIsDirectory(name: SYSTEM.ADDRESS): SYSTEM.INT32;
   PROCEDURE ["C", "Directories.-make"] CMake(name: SYSTEM.ADDRESS): SYSTEM.INT32;
+  PROCEDURE ["C", "Directories.-spelled-as-given"] CSpelledAsGiven(name: SYSTEM.ADDRESS): SYSTEM.INT32;
 
   (* Whether s has a terminating 0X inside its array. *)
   PROCEDURE Terminated(VAR s: ARRAY OF CHAR): BOOLEAN;
@@ -93,6 +94,16 @@ MODULE Directories;
   BEGIN
     RETURN Terminated(dir) & (CIsDirectory(SYSTEM.ADR(dir)) # 0)
   END IsDirectory;
+
+  (* Whether the directory of the file path names lists it spelled exactly
+     as in path. Where the file system ignores case, as macOS's does by
+     default, path also opens a file whose name differs from it in case,
+     which this tells apart. FALSE when the directory has no such entry or
+     cannot be read. *)
+  PROCEDURE SpelledAsGiven*(path: ARRAY OF CHAR): BOOLEAN;
+  BEGIN
+    RETURN Terminated(path) & (CSpelledAsGiven(SYSTEM.ADR(path)) # 0)
+  END SpelledAsGiven;
 
   (* Makes the directory dir and those it is in that are missing, as mkdir
      -p does; whether dir is a directory afterwards. *)

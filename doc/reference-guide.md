@@ -1192,6 +1192,13 @@ MODULE Directories;
   (* Whether dir names a directory that exists. *)
   PROCEDURE IsDirectory*(dir: ARRAY OF CHAR): BOOLEAN;
 
+  (* Whether the directory of the file path names lists it spelled exactly
+     as in path. Where the file system ignores case, as macOS's does by
+     default, path also opens a file whose name differs from it in case,
+     which this tells apart. FALSE when the directory has no such entry or
+     cannot be read. *)
+  PROCEDURE SpelledAsGiven*(path: ARRAY OF CHAR): BOOLEAN;
+
   (* Makes the directory dir and those it is in that are missing, as mkdir
      -p does; whether dir is a directory afterwards. *)
   PROCEDURE MakeDirectory*(dir: ARRAY OF CHAR): BOOLEAN;

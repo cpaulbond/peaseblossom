@@ -1,3 +1,8 @@
+# OpenBSD's ksh has no ulimit -v; there -d bounds anonymous mmap too. macOS
+# refuses both, and runs without a limit: there an impossible stack fails
+# anyway, but a leak only takes memory.
+  ulimit -v 1000000 2>/dev/null || ulimit -d 1000000 2>/dev/null ||
+    [ "$(uname -s)" = Darwin ] || ulimit -d 1000000
 #!/bin/sh
 . ../../testenv.sh
 # Coroutines (doc/developer/coroutines.md, Phase 3): a stack does not grow,
@@ -7,9 +12,12 @@
 # signal is 128 + its number.
 POC_IMPORT_PATH=../../../rtl/llvm
 export POC_IMPORT_PATH
-# OpenBSD's ksh has no ulimit -v; there -d bounds anonymous mmap too.
+# OpenBSD's ksh has no ulimit -v; there -d bounds anonymous mmap too. macOS
+# refuses both and runs without a limit: there an impossible stack fails
+# anyway, but a leak only takes memory.
 limit_memory() {
-  ulimit -v 1000000 2>/dev/null || ulimit -d 1000000
+  ulimit -v 1000000 2>/dev/null || ulimit -d 1000000 2>/dev/null ||
+    [ "$(uname -s)" = Darwin ] || ulimit -d 1000000
 }
 poc -o overflow.exe -build overflow.mod >result 2>&1
 (ulimit -c 0; limit_memory; ./overflow.exe >>result) 2>/dev/null

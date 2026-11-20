@@ -15,16 +15,25 @@ unset POC_IMPORT_PATH POC_LIBRARY_PATH
 # a symbol and its nm type, a weak one's "weak": OpenBSD's nm says W where
 # GNU's and LLVM's say w
 symbols() { awk '{ if ($2 ~ /^[wWvV]$/) print $1, "weak"; else print $1, $2 }'; }
+# ModuleTable's symbols in file $1 so. macOS's nm -P says U of a weak
+# reference too, so there nm -m's "weak external" is read, its "_" dropped.
+module_table_symbols() {
+  if [ "$(uname -s)" = Darwin ]
+  then nm -m "$1" | sed -n -e 's/.*(undefined) weak external _\(ModuleTable\.[^ ]*\).*/\1 weak/p' \
+                        -e 's/.*(undefined) external _\(ModuleTable\.[^ ]*\).*/\1 U/p'
+  else nm -P "$1" | grep '^ModuleTable\.' | symbols
+  fi
+}
 rm -rf work && mkdir -p work/pair work/use work/plain
 cp src/G.Mod work/pair/ && cp src/M.Mod work/use/ && cp src/N.Mod work/plain/
 : >result
 echo "== 1." >>result
 (cd work/pair && poc -compile G.Mod 2>&1 && rm G.Mod G.ll) >>result
-nm -P work/pair/G.o | grep '^ModuleTable\.' | symbols >>result
+module_table_symbols work/pair/G.o >>result
 echo "== 2." >>result
 (cd work/use && poc -import-path ../pair -o m -build M.Mod 2>&1 && ./m) >>result
 echo "== 3." >>result
 (cd work/plain && poc -import-path ../pair -o n -build N.Mod 2>&1 && ./n && echo "ran" \
-  && nm -P n | grep '^ModuleTable\.' | symbols) >>result
+  && module_table_symbols n) >>result
 rm -rf work
 . ../../testresult.sh

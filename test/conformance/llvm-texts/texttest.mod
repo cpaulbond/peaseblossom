@@ -1,4 +1,4 @@
-MODULE texts;
+MODULE texttest;
 
   (* Texts under poc and voc: writing, editing (Insert, Delete, Recall,
      Save, Copy, ChangeLooks), reading, scanning, and filing - Close's file
@@ -75,7 +75,7 @@ MODULE texts;
   (* the command Load calls for a Mark *)
   PROCEDURE Alloc*;
   BEGIN
-    Texts.new := NewMark("?", "texts")
+    Texts.new := NewMark("?", "texttest")
   END Alloc;
 
   PROCEDURE NewText(): Texts.Text;
@@ -152,8 +152,8 @@ BEGIN
 
   (* readers *)
   T := NewText();
-  Texts.WriteString(W, "ab"); Texts.WriteElem(W, NewMark("1", "texts")); Texts.WriteString(W, "cd");
-  Texts.WriteElem(W, NewMark("2", "texts")); Texts.WriteString(W, "e"); Texts.Append(T, W.buf);
+  Texts.WriteString(W, "ab"); Texts.WriteElem(W, NewMark("1", "texttest")); Texts.WriteString(W, "cd");
+  Texts.WriteElem(W, NewMark("2", "texttest")); Texts.WriteString(W, "e"); Texts.Append(T, W.buf);
   Show(T);
   Texts.OpenReader(R, T, 3); Texts.Read(R, ch); Out.Char(ch); Out.Int(Texts.Pos(R), 2); Out.Ln;
   Texts.OpenReader(R, T, 0); Texts.ReadElem(R);
@@ -190,4 +190,4 @@ BEGIN
   Texts.WriteString(W, "- + ( 12. .5"); Texts.Write(W, 9X); Texts.WriteString(W, "/opt");
   Texts.Append(T, W.buf);
   Scanned(T)
-END texts.
+END texttest.

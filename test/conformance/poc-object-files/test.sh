@@ -11,7 +11,7 @@
 # already is (a module's object or another object) or with a space in its
 # name. The host's triple and the keys are masked.
 unset POC_IMPORT_PATH POC_LIBRARY_PATH
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 mask() {
   sed -e "s|$triple|<triple>|g" -e 's/[0-9a-f]\{16\}/<key>/g' \
       -e 's/^poc [0-9][0-9.]*$/poc <version>/'
@@ -31,7 +31,8 @@ poc -lto -o use3 ../Use.Mod twice.o 2>&1 | mask >>../result
 echo "== -library" >>../result
 poc -output-dir lib -library quad ../Quad.Mod twice.o 2>&1 | mask >>../result
 mask <lib/$triple/O2/quad.library >>../result
-ar t lib/$triple/O2/libquad.a | LC_ALL=C sort >>../result
+# (macOS's ar lists its symbol table, __.SYMDEF SORTED, as a member)
+ar t lib/$triple/O2/libquad.a | grep -v '^__\.SYMDEF' | LC_ALL=C sort >>../result
 echo "== a program using it" >>../result
 poc -library-path lib -build ../Main.Mod 2>&1 | mask >>../result
 ./Main >>../result

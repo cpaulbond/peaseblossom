@@ -101,4 +101,42 @@ MODULE Directories;
     RETURN IsDirectory(dir)
   END MakeDirectory;
 
+  (* text[from..to - 1] onto command at k, in single quotes, as
+     MakeDirectory quotes dir; FALSE when command is too small *)
+  PROCEDURE AppendQuoted(VAR command: ARRAY OF CHAR; VAR k: LONGINT; text: ARRAY OF CHAR; from, to: LONGINT): BOOLEAN;
+  BEGIN
+    IF k >= LEN(command) - 2 THEN RETURN FALSE END;
+    command[k] := "'"; INC(k);
+    WHILE (from < to) & (k < LEN(command) - 6) DO
+      IF text[from] = "'" THEN
+        command[k] := "'"; command[k + 1] := "\"; command[k + 2] := "'"; command[k + 3] := "'"; INC(k, 4)
+      ELSE command[k] := text[from]; INC(k)
+      END;
+      INC(from)
+    END;
+    command[k] := "'"; INC(k); command[k] := 0X;
+    RETURN from = to
+  END AppendQuoted;
+
+  (* Whether the directory of the file path names lists it spelled exactly
+     as in path, as rtl/llvm's: by ls -a in that directory, and grep -F -x
+     for the name. *)
+  PROCEDURE SpelledAsGiven*(path: ARRAY OF CHAR): BOOLEAN;
+    VAR command: ARRAY 2300 OF CHAR; middle: ARRAY 48 OF CHAR; i, k, slash, length: LONGINT;
+  BEGIN
+    length := 0; slash := -1;
+    WHILE (length < LEN(path)) & (path[length] # 0X) DO
+      IF path[length] = "/" THEN slash := length END;
+      INC(length)
+    END;
+    command := "cd "; k := 3;
+    IF slash < 0 THEN command[k] := "."; INC(k)
+    ELSIF slash = 0 THEN command[k] := "/"; INC(k)
+    ELSIF ~AppendQuoted(command, k, path, 0, slash) THEN RETURN FALSE
+    END;
+    middle := " 2>/dev/null && ls -a | grep -F -x -q -- "; i := 0;
+    WHILE middle[i] # 0X DO command[k] := middle[i]; INC(k); INC(i) END;
+    RETURN AppendQuoted(command, k, path, slash + 1, length) & (Platform.System(command) = 0)
+  END SpelledAsGiven;
+
 END Directories.

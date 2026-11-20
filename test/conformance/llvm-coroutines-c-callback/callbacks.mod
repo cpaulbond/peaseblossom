@@ -1,4 +1,4 @@
-MODULE callback;
+MODULE callbacks;
   (* A coroutine switches out of a C callback, and is resumed, and returns
      to C, before anything else uses that C code. A list reachable only
      from the C frame of the suspended stack survives the collections main
@@ -71,4 +71,4 @@ BEGIN
   Out.Ln;
   Coroutines.Transfer(main, worker);
   ShowRounding("main")
-END callback.
+END callbacks.

@@ -341,17 +341,30 @@ MODULE ModuleInterface;
      Phase 7's original cwd-only behavior - see every existing multi-
      module conformance fixture), then each searchPathHead..Tail directory
      in the order they were added, stopping at the first one that opens. *)
+  (* The file path names, opened, or NIL: NIL too when its directory lists
+     it spelled otherwise (Directories.SpelledAsGiven). A file system that
+     ignores case, as macOS's does, opens Callback.mod for callback.mod;
+     here that is no Callback.mod, as on any other system, so the search
+     goes on and a message names the file that is there. *)
+  PROCEDURE OpenExact(path: ARRAY OF CHAR): Files.File;
+    VAR f: Files.File;
+  BEGIN
+    f := Files.Old(path);
+    IF (f # NIL) & ~Directories.SpelledAsGiven(path) THEN Files.Close(f); f := NIL END;
+    RETURN f
+  END OpenExact;
+
   (* name in the current directory, else in each search-path directory in
      turn; path is what was opened (name itself, or <dir>/name) *)
   PROCEDURE OpenFound(name: ARRAY OF CHAR; VAR path: ARRAY OF CHAR): Files.File;
     VAR f: Files.File; e: SearchPathEntry;
   BEGIN
     COPY(name, path);
-    f := Files.Old(name);
+    f := OpenExact(name);
     e := searchPathHead;
     WHILE (f = NIL) & (e # NIL) DO
       Directories.MakePath(e.dir, name, path);
-      f := Files.Old(path);
+      f := OpenExact(path);
       e := e.next
     END;
     RETURN f
@@ -500,11 +513,11 @@ MODULE ModuleInterface;
     f := NIL;
     IF (libraryLookup # NIL) & libraryLookup(moduleName, dir) THEN
       Directories.MakePath(dir, name, path);
-      f := Files.Old(path)
+      f := OpenExact(path)
     END;
     IF (f = NIL) & (interfaceDir[0] # 0X) THEN
       Directories.MakePath(interfaceDir, name, path);
-      f := Files.Old(path)
+      f := OpenExact(path)
     END;
     IF f = NIL THEN f := OpenFound(name, path) END;
     IF f = NIL THEN

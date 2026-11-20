@@ -207,6 +207,13 @@ The import path is `-import-path <dir>`, repeatable, after the directories of
 `POC_IMPORT_PATH` (separated by colons). Only those directories are searched,
 not the directories inside them.
 
+A file's name must be spelled as the module's is, in the same case, on
+every system. Where the file system ignores case, as macOS's does, poc
+passes over a file whose name differs from the module's only in case
+(`shapes.mod` for `Shapes`), as a system that tells them apart would. Two
+modules whose names differ only in case cannot share a directory there,
+since their `.sym`, `.ll`, and `.o` files would be the same files.
+
 <!-- example: project/lib/Shapes.Mod -->
 ```
 MODULE Shapes;

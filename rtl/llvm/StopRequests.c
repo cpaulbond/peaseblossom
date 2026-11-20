@@ -8,12 +8,18 @@
 #include <stdint.h>
 #include <string.h>
 
-#define NAME(n) __asm__("StopRequests.-" n)
+/* A name as the linker sees it: Mach-O (macOS) puts "_" before every C
+   name (__USER_LABEL_PREFIX__), which the Oberon side's references get
+   too; ELF puts nothing. */
+#define LABEL_PREFIX_TEXT(p) #p
+#define LABEL_PREFIX(p) LABEL_PREFIX_TEXT(p)
+#define LABEL(n) LABEL_PREFIX(__USER_LABEL_PREFIX__) n
+#define NAME(n) __asm__(LABEL("StopRequests.-" n))
 
 /* Platform.c's count of the signal handlers running, which Coroutines
    reads to refuse a Transfer in one; the notifier runs inside a handler,
    so it is counted too. */
-extern volatile int32_t PlatformHandlersRunning __asm__("Platform.-handlers-running");
+extern volatile int32_t PlatformHandlersRunning __asm__(LABEL("Platform.-handlers-running"));
 
 /* What StopRequests.Mod's none, interrupt and terminate are. */
 enum { none = 0, interrupt = 1, terminate = 2 };

@@ -1,0 +1,24 @@
+== without -link
+poc: build failed
+== -static
+poc: -static cannot link for macOS, which has no static C library
+poc: build failed
+exit=1
+== -link and -verbose
+clang -c --target=<triple> -O<level> -fPIC 'FileDescriptorOutput.ll' -o 'FileDescriptorOutput.o'
+clang -c --target=<triple> -O<level> -fPIC 'RealDigits.ll' -o 'RealDigits.o'
+clang -c --target=<triple> -O<level> -fPIC 'FormattedText.ll' -o 'FormattedText.o'
+clang -c --target=<triple> -O<level> -fPIC 'FormattedOutput.ll' -o 'FormattedOutput.o'
+clang -c --target=<triple> -O<level> -fPIC 'Out.ll' -o 'Out.o'
+clang -c --target=<triple> -O<level> -fPIC 'linkflags.ll' -o 'linkflags.o'
+clang --target=<triple> -O<level> -Wl,-U,_ModuleTable.Register 'FileDescriptorOutput.o' 'RealDigits.o' 'FormattedText.o' 'FormattedOutput.o' 'Out.o' 'linkflags.o' -o 'poc-link-flags' '-Llib dir' '-lpocfixture' -lm
+21
+exit=0
+INTERP: 1
+== -link, dynamic
+21
+exit=0
+INTERP: 1
+== -link without an argument
+poc: -link requires an argument
+exit=1

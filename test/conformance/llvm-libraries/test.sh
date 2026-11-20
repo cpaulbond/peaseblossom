@@ -11,11 +11,11 @@
 # can only come from a library; -clear-library-path keeps poc's own
 # lib/poc out. The host's triple and the keys are masked.
 unset POC_IMPORT_PATH POC_LIBRARY_PATH
-triple=$(clang -dumpmachine)
+triple=$(host_triple)
 mask() {
   sed -e "s|$triple|<triple>|g" -e 's/[0-9a-f]\{16\}/<key>/g' -e 's/libpoc-rtl\.so\.0\.0/libpoc-rtl.so/' \
       -e 's/^poc [0-9][0-9.]*$/poc <version>/' \
-      -e 's/libshapes\.so\.0\.0/libshapes.so/'
+      -e 's/libshapes\.so\.0\.0/libshapes.so/' -e 's/\(lib[a-z-]*\)\.dylib/\1.so/g'
 }
 poc() { command poc -clear-library-path "$@"; }
 rm -rf work && mkdir work && cd work || exit 1

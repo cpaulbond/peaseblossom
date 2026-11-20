@@ -1,7 +1,7 @@
 #!/bin/sh
 . ../../testenv.sh
 # PLAN.md Phase 17 step 3 (doc/developer/vax-macro32-backend.md, section
-# 19.19, proposals 1 and 4): Texts on VAX/VMS, with llvm-texts' texts.mod
+# 19.19, proposals 1 and 4): Texts on VAX/VMS, with llvm-texts' texttest.mod
 # as TextsUse.mod, since VMS does not tell texts from Texts, its elements
 # naming that module too; built for the VAX under -O2 and run there
 # (vax_do, guest-run.com). It must print llvm-texts' expected, but that a
@@ -14,8 +14,8 @@
 rtl=../../../rtl/vax
 written="TextsUse.mar FileBytes.mar Texts.mar Files.mar Modules.mar Platform.mar GarbageCollectedHeap.mar Args.mar DecimalToReal.mar Reals.mar RealDigits.mar Out.mar LineOutput.mar FormattedOutput.mar FormattedText.mar"
 files="elements.Text plain.Text lines.txt"
-awk '{sub(/^MODULE texts;/, "MODULE TextsUse;"); sub(/^END texts\./, "END TextsUse."); gsub(/"texts"/, "\"TextsUse\""); print}' \
-  ../llvm-texts/texts.mod >TextsUse.mod
+awk '{sub(/^MODULE texttest;/, "MODULE TextsUse;"); sub(/^END texttest\./, "END TextsUse."); gsub(/"texttest"/, "\"TextsUse\""); print}' \
+  ../llvm-texts/texttest.mod >TextsUse.mod
 : >result
 # the files, as the host's build writes them
 rm -rf host && mkdir host && cp TextsUse.mod host
