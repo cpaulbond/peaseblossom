@@ -376,6 +376,63 @@ run `poc -check`. It compares what poc prints, its status and the files
 it writes with the host's poc doing the same for the VAX. `-only` keeps
 the fixtures whose names match.
 
+### Every system poc has been checked on
+
+The systems poc has been checked on so far, with the original developer's
+host for each and what it is used for. "Gate" is the check before every
+commit (above), "pushed" the check of pushed commits, "packages" the
+release packages built there (section 6). A developer setting up their
+own machines needs one of each system and architecture, real or
+virtual; the names are only the original developer's.
+
+| Host | System | Architecture | clang | Used for |
+|---|---|---|---|---|
+| atla | Fedora 44 | x86_64 | 22.1.8 (Fedora's) | gate (`make check`, `make check-opt2`); the tarball, the RPMs and their signing; the SIMH VAX; packages for Debian 13 amd64, in a `debian:trixie` container |
+| cymoril | OpenBSD 7.9 | i386 | 19 (base system) | gate (`gmake check-stage1`); OpenBSD i386 package |
+| artos | NetBSD 11.0 | amd64 | 21 (pkgsrc) | gate (`gmake check-stage1`); NetBSD amd64 package |
+| alerik | FreeBSD 15.1 | amd64 | 19 (base system) | gate (`gmake check-stage1`); FreeBSD amd64 package |
+| rackhir | FreeBSD 15.1 | arm64, emulated | 19 (base system) | pushed commits, after architecture-dependent changes and at each phase's close; FreeBSD arm64 package |
+| jherek | OpenBSD 7.9 | amd64 | the base system's | OpenBSD amd64 package |
+| yishana | NetBSD 11.0 | i386 | pkgsrc's | NetBSD i386 package |
+| sadric | Raspberry Pi OS (Debian 13, trixie), on a Raspberry Pi 400 | arm64 | Debian's | Debian arm64 package |
+| erekose | OpenBSD (release not recorded) | i386 | the base system's | an office machine, with voc at the same paths (`AGENTS.md`); its use is not recorded |
+| terhali | NetBSD (release not recorded) | amd64 | pkgsrc's | an office machine, with voc at the same paths (`AGENTS.md`); its use is not recorded |
+| (SIMH on atla) | VAX/VMS 5.5-2H4 with UCX, a `microvax3900` | VAX | none (poc's VAX back end) | the VAX fixtures assembled and run there; `make vax-stages`, the kits (section "The VAX/VMS development system") |
+| Mac | macOS 27.2 | arm64 (Apple silicon) | Apple clang 21 | the `macos` branch only, so far: `make check` (with voc 5.3.0; below) |
+
+A host for the gate or the pushed-commit check needs:
+
+- clang 19 or later on `PATH` (on NetBSD, pkgsrc's for the system's own
+  release; `INSTALL.md`, section 1), and GNU make (`gmake` on the BSDs
+  and macOS);
+- voc 2.1.0 in `/usr/local/sw/versions/voc/git` (`bin`, `lib`), built
+  from `github.com/vishapoberon/compiler`, at that path on every host so
+  that `test/testenv.sh` finds it over a non-interactive `ssh`; another
+  path is `VOC_BIN_DIR` and `VOC_LIB_DIR`. Another release of voc builds
+  Stage 0, but a fixture that compares poc with voc may then differ (voc
+  5.3.0's `Out.Hex` takes no digit count: `llvm-out` skips its
+  comparison when voc is not 2.1.0, `test/testenv.sh`'s
+  `voc_is_reference`);
+- `ssh <host>` without a password from the machine that runs
+  `tools/check-hosts`, and a home directory where it can make `~/poc-bsd`;
+- optionally: mandoc (`doc-poc-man-page`), gdb or lldb (`llvm-debug-info`;
+  OpenBSD's is the `gdb` package's `egdb`), and valgrind
+  (`llvm-coroutines-valgrind`); without one, its fixture skips and still
+  passes, so the host does not check what it checks. On Linux,
+  `glibc-static` for `poc -static`; on NetBSD, lld for `poc -lto`.
+
+The machine that makes the tarball needs `make doc`'s tools too (section
+2): pandoc, xelatex with the DejaVu fonts, mandoc, and groff. The VAX
+needs SIMH, VMS 5.5-2 with TCP/IP, the accounts `poc` and `poc2`, expect,
+telnet, and curl on the machine that drives it (section "The VAX/VMS
+development system").
+
+macOS (the `macos` branch, 2026-11-19): GNU make is Homebrew's `gmake`
+(Apple's `make` is 3.81, too old for the `GNUmakefile`); voc 5.3.0 for
+macOS builds Stage 0 (`VOC_BIN_DIR` its `bin`, `VOC_LIB_DIR` the real
+`lib` directory when `bin/voc` is a symbolic link). It has not been a
+gate host.
+
 ### With other machines
 
 None of this needs those particular machines. What matters is that a
