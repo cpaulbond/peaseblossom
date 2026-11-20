@@ -33,9 +33,12 @@ OpenBSD and FreeBSD.
 
 A target is an LLVM target triple: by default clang's own for the host,
 otherwise the one `-target` names. poc has been run on x86_64 Linux,
-NetBSD, FreeBSD and OpenBSD, i386 OpenBSD and NetBSD, and aarch64
-FreeBSD. The target fixes the *word size*, 4 or 8 bytes: the size of a
-pointer, a procedure value and `SYSTEM.ADDRESS`.
+NetBSD, FreeBSD, and OpenBSD; i386 OpenBSD and NetBSD; and arm64
+(aarch64) FreeBSD, Linux (Debian 13, its package's install check only),
+and macOS. On macOS the default triple is the one clang compiles for,
+`arm64-apple-macosx<version>`, not `clang -dumpmachine`'s `darwin` one.
+The target fixes the *word size*, 4 or 8 bytes: the size of a pointer, a
+procedure value, and `SYSTEM.ADDRESS`.
 
 The *size model* fixes the integer types' sizes, as voc's do: `-O2`, the
 default, has the classic Oberon-2 sizes; `-OC` has Component Pascal's. A
