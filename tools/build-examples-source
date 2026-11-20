@@ -14,7 +14,7 @@
 # the installed poc (the foreign command POC) to .OBJ files and links it
 # with the procedure poc writes:
 #
-#   $ @POC-EXAMPLES-SOURCE-0-14-0
+#   $ @POC-EXAMPLES-SOURCE-0-15-0
 #   $ @BUILD
 #
 # Unlike build-examples vax's kit, which holds MACRO-32 that poc wrote on

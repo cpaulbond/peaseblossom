@@ -25,7 +25,7 @@
 %global __provides_exclude_from ^%{_prefix}/lib/poc/.*$
 
 Name:           peaseblossom
-Version:        0.14.0
+Version:        0.15.0
 Release:        1%{?dist}
 Summary:        Oberon-2 compiler (poc) using LLVM
 
@@ -112,6 +112,23 @@ test/install/check-vax.sh %{buildroot}%{_bindir}/poc %{_builddir}/check-install-
 %{_docdir}/%{name}-vax/
 
 %changelog
+* Thu Nov 19 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.15.0-1
+- Update to 0.15.0: indexing a string constant, a read-only
+  ARRAY m+1 OF CHAR (s[k] folds to a CHAR constant, s[i] is index-checked,
+  LEN(s) is a constant), on both back ends; In.Peek; OutStr's At twins
+  (CharAt, StringAt, IntAt, ...) that append at a position; memcheck no
+  longer reports the collector's stack scan; poc gives clang -march=i686
+  for 32-bit x86 Linux, whose default CPU used SSE2. Fixes: the collector
+  no longer frees a reachable object of a record with no fields on 64-bit
+  targets; In.Int, In.LongInt, InStr.Int and InStr.LongInt clear Done for
+  a number too large for the variable; Files on 32-bit targets keeps a
+  seek position of 2^32 or more; MAX(SYSTEM.ADDRESS) and
+  MIN(SYSTEM.ADDRESS) are accepted; poc no longer crashes on a module or
+  procedure with no name whose END has one; the VAX back end indexes a
+  structured constant with a variable; the LLVM back end folds a constant
+  selection from a structured constant. Libraries from an older poc must
+  be rebuilt.
+
 * Mon Nov 16 2026 T. Kurt Bond <tkurtbond@gmail.com> - 0.14.0-1
 - Update to 0.14.0: the runtime module StopRequests, on both back ends,
   so that a program stops cleanly on SIGINT and SIGTERM (CTRL/C on
