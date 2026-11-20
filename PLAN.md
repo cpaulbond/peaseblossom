@@ -1822,6 +1822,18 @@ Those fixed while Phase 18 was current, 8-10, are in
       a whole row, a whole field array and a variable index still use
       the copy.
 
+33. **`vax-asts-heap` can count too few collections**. Found
+    2026-11-20, in the 0.15.0 gate on atla (`tools/check-hosts`): the
+    objects build's run of `AstHeap` printed "collections during the
+    run: 2" for the expected "3 or more", twice in `guest-run.com`; the
+    fixture passed when rerun alone. How many collections come depends
+    on where the 10 ms timer AST falls among the main line's `NEW`s (4
+    to 6 seen when it was written), so the count says nothing wrong; the
+    program's own checks (bad batches, bad lists) were 0. To fix: have
+    the main line run until a number of collections has happened (with a
+    limit of passes), or ask for "1 or more", which still shows
+    collections while ASTs allocate.
+
 ## Ongoing library enhancements
 
 Additions to the runtime library (`rtl/llvm`) that using poc on other
